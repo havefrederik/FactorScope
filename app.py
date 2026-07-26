@@ -3,10 +3,11 @@ from __future__ import annotations
 import streamlit as st
 
 from factorscope.demo import ensure_demo_data
-from pages.stock_analysis import render as render_stock
-from pages.portfolio_analysis import render as render_portfolio
-from pages.scenario_analysis import render as render_scenarios
-from pages.methodology import render as render_methodology
+from views.stock_analysis import render as render_stock
+from views.portfolio_analysis import render as render_portfolio
+from views.scenario_analysis import render as render_scenarios
+from views.model_diagnostics import render as render_diagnostics
+from views.methodology import render as render_methodology
 
 st.set_page_config(
     page_title="FactorScope",
@@ -22,7 +23,13 @@ st.sidebar.caption("Factor and idiosyncratic return intelligence for fundamental
 
 page = st.sidebar.radio(
     "Navigate",
-    ["Stock Analysis", "Portfolio Analysis", "Scenario Analysis", "Methodology"],
+    [
+        "Stock Analysis",
+        "Portfolio Analysis",
+        "Scenario Analysis",
+        "Model Diagnostics",
+        "Methodology",
+    ],
 )
 
 st.sidebar.divider()
@@ -37,5 +44,7 @@ elif page == "Portfolio Analysis":
     render_portfolio()
 elif page == "Scenario Analysis":
     render_scenarios()
+elif page == "Model Diagnostics":
+    render_diagnostics()
 else:
     render_methodology()

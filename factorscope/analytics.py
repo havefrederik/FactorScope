@@ -186,6 +186,14 @@ def stock_return_attribution(
 
 
 def standardize_exposures(df: pd.DataFrame) -> pd.DataFrame:
+    if {"asof_date", "permno", "exposure_model"}.issubset(df.columns) and any(
+        str(c).startswith("beta_") for c in df.columns
+    ):
+        from .v9_adapter import adapt_v9_exposures
+        models = set(df["exposure_model"].astype(str))
+        preferred = "EWLS_126" if "EWLS_126" in models else str(df["exposure_model"].iloc[0])
+        return adapt_v9_exposures(df, exposure_model=preferred)
+
     ticker_col = resolve_column(df, "ticker", required=True)
     factor_col = resolve_column(df, "factor")
     exposure_col = resolve_column(df, "exposure")

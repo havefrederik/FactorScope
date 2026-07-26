@@ -5,23 +5,23 @@ fundamental investors.
 
 It helps distinguish between:
 
-- return associated with broad systematic factors
-- company-specific or residual return
-- hidden factor concentration across a portfolio
-- first-order exposure to market and style-factor scenarios
+- return associated with broad systematic factors;
+- company-specific or residual return;
+- hidden factor concentration across a portfolio;
+- first-order exposure to market and style-factor scenarios.
 
 ## Current status
 
 This repository is the first deployable website release. It includes:
 
-- stock return attribution
-- portfolio return attribution
-- portfolio factor exposures
-- factor-shock scenarios
-- demo data
-- CSV/Parquet uploads
-- tests
-- a Streamlit interface
+- stock return attribution;
+- portfolio return attribution;
+- portfolio factor exposures;
+- factor-shock scenarios;
+- demo data;
+- CSV/Parquet uploads;
+- tests;
+- a Streamlit interface.
 
 ## Run locally
 
@@ -90,4 +90,9 @@ included demo data.
 
 Specific return is not automatically investor skill. It can contain company
 news, omitted factors, model misspecification and noise. FactorScope supports
-fundamental judgment. It does not replace it.
+fundamental judgment; it does not replace it.
+
+
+## V2
+
+V2 adds native FactorScope V9 adapters, model diagnostics, and clean controlled navigation.

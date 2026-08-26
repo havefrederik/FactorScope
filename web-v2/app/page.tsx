@@ -7,21 +7,23 @@ type Holding = { ticker: string; name: string; sector: string; value: number; be
 type View = "Overview" | "Compare" | "Strategy Analysis" | "Risk Analysis" | "Security Analysis" | "Performance" | "Scenario Lab" | "Methodology" | "Project Brief";
 
 const seed: Holding[] = [
-  { ticker: "AAPL", name: "Apple", sector: "Technology", value: 130000, beta: 1.14, vol: 24.8, risk: 16.2 },
-  { ticker: "MSFT", name: "Microsoft", sector: "Technology", value: 130000, beta: 1.06, vol: 22.1, risk: 14.8 },
-  { ticker: "NVDA", name: "NVIDIA", sector: "Technology", value: 100000, beta: 1.72, vol: 45.6, risk: 19.7 },
-  { ticker: "AMZN", name: "Amazon", sector: "Consumer", value: 90000, beta: 1.28, vol: 31.2, risk: 11.1 },
-  { ticker: "JPM", name: "JPMorgan", sector: "Financials", value: 100000, beta: 1.09, vol: 20.7, risk: 9.8 },
-  { ticker: "XOM", name: "Exxon Mobil", sector: "Energy", value: 80000, beta: 0.88, vol: 23.4, risk: 7.6 },
-  { ticker: "UNH", name: "UnitedHealth", sector: "Healthcare", value: 80000, beta: 0.72, vol: 25.1, risk: 6.9 },
-  { ticker: "CAT", name: "Caterpillar", sector: "Industrials", value: 70000, beta: 1.11, vol: 26.3, risk: 6.4 },
-  { ticker: "COST", name: "Costco", sector: "Consumer", value: 70000, beta: 0.83, vol: 19.4, risk: 4.8 },
-  { ticker: "BRK.B", name: "Berkshire Hathaway", sector: "Financials", value: 100000, beta: 0.87, vol: 15.9, risk: 3.8 },
-  { ticker: "CASH", name: "Cash", sector: "Cash", value: 50000, beta: 0, vol: 0, risk: 0 },
+  { ticker: "AAPL", name: "Apple", sector: "Technology", value: 150000, beta: 1.14, vol: 24.8, risk: 16.2 },
+  { ticker: "MSFT", name: "Microsoft", sector: "Technology", value: 150000, beta: 1.06, vol: 22.1, risk: 14.8 },
+  { ticker: "JPM", name: "JPMorgan Chase", sector: "Financials", value: 100000, beta: 1.09, vol: 20.7, risk: 9.8 },
+  { ticker: "BRK.B", name: "Berkshire Hathaway", sector: "Financials", value: 100000, beta: 0.87, vol: 15.9, risk: 7.4 },
+  { ticker: "JNJ", name: "Johnson & Johnson", sector: "Healthcare", value: 70000, beta: 0.62, vol: 17.2, risk: 5.6 },
+  { ticker: "ABBV", name: "AbbVie", sector: "Healthcare", value: 70000, beta: 0.68, vol: 19.3, risk: 5.8 },
+  { ticker: "PG", name: "Procter & Gamble", sector: "Consumer Staples", value: 60000, beta: 0.55, vol: 15.4, risk: 4.4 },
+  { ticker: "WMT", name: "Walmart", sector: "Consumer Staples", value: 60000, beta: 0.54, vol: 18.1, risk: 4.6 },
+  { ticker: "COST", name: "Costco", sector: "Consumer Staples", value: 60000, beta: 0.83, vol: 19.4, risk: 4.8 },
+  { ticker: "XOM", name: "Exxon Mobil", sector: "Energy", value: 50000, beta: 0.88, vol: 23.4, risk: 4.9 },
+  { ticker: "NEE", name: "NextEra Energy", sector: "Utilities", value: 40000, beta: 0.58, vol: 22.0, risk: 3.7 },
+  { ticker: "CAT", name: "Caterpillar", sector: "Industrials", value: 50000, beta: 1.11, vol: 26.3, risk: 5.1 },
+  { ticker: "CASH", name: "Cash", sector: "Cash", value: 40000, beta: 0, vol: 0, risk: 0 },
 ];
 
 const stockCatalog = [
-  ["AAPL","Apple","Technology"],["MSFT","Microsoft","Technology"],["NVDA","NVIDIA","Technology"],["AMZN","Amazon","Consumer"],["GOOGL","Alphabet","Technology"],["META","Meta Platforms","Technology"],["TSLA","Tesla","Consumer"],["AVGO","Broadcom","Technology"],["AMD","Advanced Micro Devices","Technology"],["CRM","Salesforce","Technology"],["ORCL","Oracle","Technology"],["NFLX","Netflix","Communication Services"],["JPM","JPMorgan Chase","Financials"],["BAC","Bank of America","Financials"],["GS","Goldman Sachs","Financials"],["BRK.B","Berkshire Hathaway","Financials"],["XOM","Exxon Mobil","Energy"],["CVX","Chevron","Energy"],["COP","ConocoPhillips","Energy"],["UNH","UnitedHealth","Healthcare"],["LLY","Eli Lilly","Healthcare"],["JNJ","Johnson & Johnson","Healthcare"],["ABBV","AbbVie","Healthcare"],["CAT","Caterpillar","Industrials"],["GE","GE Aerospace","Industrials"],["BA","Boeing","Industrials"],["COST","Costco","Consumer"],["WMT","Walmart","Consumer"],["HD","Home Depot","Consumer"],["KO","Coca-Cola","Consumer"],["PEP","PepsiCo","Consumer"],["PG","Procter & Gamble","Consumer"],["DIS","Walt Disney","Communication Services"],["MCD","McDonald’s","Consumer"],
+  ["AAPL","Apple","Technology"],["MSFT","Microsoft","Technology"],["NVDA","NVIDIA","Technology"],["AMZN","Amazon","Consumer"],["GOOGL","Alphabet","Technology"],["META","Meta Platforms","Technology"],["TSLA","Tesla","Consumer"],["AVGO","Broadcom","Technology"],["AMD","Advanced Micro Devices","Technology"],["CRM","Salesforce","Technology"],["ORCL","Oracle","Technology"],["NFLX","Netflix","Communication Services"],["JPM","JPMorgan Chase","Financials"],["BAC","Bank of America","Financials"],["GS","Goldman Sachs","Financials"],["BRK.B","Berkshire Hathaway","Financials"],["XOM","Exxon Mobil","Energy"],["CVX","Chevron","Energy"],["COP","ConocoPhillips","Energy"],["UNH","UnitedHealth","Healthcare"],["LLY","Eli Lilly","Healthcare"],["JNJ","Johnson & Johnson","Healthcare"],["ABBV","AbbVie","Healthcare"],["CAT","Caterpillar","Industrials"],["GE","GE Aerospace","Industrials"],["BA","Boeing","Industrials"],["COST","Costco","Consumer Staples"],["WMT","Walmart","Consumer Staples"],["HD","Home Depot","Consumer"],["KO","Coca-Cola","Consumer Staples"],["PEP","PepsiCo","Consumer Staples"],["PG","Procter & Gamble","Consumer Staples"],["NEE","NextEra Energy","Utilities"],["DUK","Duke Energy","Utilities"],["SO","Southern Company","Utilities"],["DIS","Walt Disney","Communication Services"],["MCD","McDonald’s","Consumer"],
 ] as const;
 
 const allocationPalette = ["#25d2c6", "#6d5dfc", "#ec9b56", "#6dbb68", "#e4cf6c", "#6f7d91", "#e06c9f", "#3b82f6", "#a3e635", "#f97316"];
@@ -337,7 +339,7 @@ export default function Home() {
   const [dataError, setDataError] = useState<string | null>(null);
   const [portfolioError,setPortfolioError]=useState<string|null>(null);
   const [portfolioSource,setPortfolioSource]=useState<"demo"|"uploaded">("demo");
-  const [portfolioName,setPortfolioName]=useState("Balanced US Equity");
+  const [portfolioName,setPortfolioName]=useState("Lower-Beta US Equity");
   const [selectedTicker,setSelectedTicker]=useState<string|null>(null);
   const [addingSecurity,setAddingSecurity]=useState(false);
   const [securitySearch,setSecuritySearch]=useState("");
@@ -425,7 +427,7 @@ export default function Home() {
   function remove(ticker: string) { if(ticker==="CASH")return;setHoldings(items=>{const removed=items.find(item=>item.ticker===ticker)?.value??0;const remaining=items.filter(item=>item.ticker!==ticker);return remaining.some(item=>item.ticker==="CASH")?remaining.map(item=>item.ticker==="CASH"?{...item,value:item.value+removed}:item):[...remaining,{ticker:"CASH",name:"Cash (residual)",sector:"Cash",value:removed,beta:0,vol:0,risk:0}]}); }
   function addSecurity(rawTicker:string) {const ticker=rawTicker.trim().toUpperCase();if(!/^[A-Z][A-Z0-9.-]{0,9}$/.test(ticker)){setPortfolioError("Enter a valid US ticker symbol.");return}if(holdings.some(item=>item.ticker===ticker)){setPortfolioError(`${ticker} is already in the portfolio.`);return}const match=stockCatalog.find(item=>item[0]===ticker);const added:Holding={ticker,name:match?.[1]??ticker,sector:match?.[2]??"Unclassified",value:0,beta:1,vol:25,risk:2};setHoldings(items=>[...items.filter(item=>item.ticker!=="CASH"),added,...items.filter(item=>item.ticker==="CASH")]);setAddingSecurity(false);setSecuritySearch("");setPortfolioError(null)}
   function saveBaseline(){setBaselineHoldings(holdings.map(item=>({...item})));}
-  function resetDemo(){setHoldings(seed);setBaselineHoldings(seed);setPortfolioSource("demo");setPortfolioName("Balanced US Equity");setPortfolioError(null)}
+  function resetDemo(){setHoldings(seed);setBaselineHoldings(seed);setPortfolioSource("demo");setPortfolioName("Lower-Beta US Equity");setPortfolioError(null)}
   function upload(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]; if (!file) return;
     const reader = new FileReader(); reader.onload = () => {

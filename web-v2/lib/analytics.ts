@@ -63,6 +63,7 @@ export type StrategyRebalancePoint = StrategyExposurePoint & {
   cost: number;
   largestPosition: string;
   largestWeight: number;
+  weights: { ticker: string; weight: number }[];
 };
 export type StrategyBacktestAnalytics = {
   dates: string[];
@@ -430,6 +431,7 @@ export function buildRiskTargetStrategy(payload: MarketPayload, holdings: Analyt
         cost: total * curve.at(-1)! * costRate,
         largestPosition: active[largestIndex].ticker,
         largestWeight: currentWeights[largestIndex],
+        weights: active.map((holding, index) => ({ ticker: holding.ticker, weight: currentWeights[index] })).sort((first, second) => second.weight - first.weight),
       });
     }
 

@@ -283,9 +283,9 @@ function setPresetIdSafe(selectPreset:(id:string)=>void){selectPreset("custom")}
 
 function WorkspaceTabs<T extends string>({ items, selected, onSelect }: { items: readonly T[]; selected: T; onSelect: (item:T)=>void }) {return <div className="workspace-tabs" role="tablist">{items.map(item=><button key={item} role="tab" aria-selected={selected===item} className={selected===item?"active":""} onClick={()=>onSelect(item)}>{item}</button>)}</div>}
 
-function RiskWorkspace({ tab, setTab, model, total, holdings, analytics, payload, onSelectTicker }: { tab:"Factors"|"Positions"|"Correlations"; setTab:(tab:"Factors"|"Positions"|"Correlations")=>void; model:FactorModelAnalytics; total:number; holdings:Holding[]; analytics:PortfolioAnalytics; payload:MarketPayload; onSelectTicker:(ticker:string)=>void }) {return <><WorkspaceTabs items={["Factors","Positions","Correlations"] as const} selected={tab} onSelect={setTab}/>{tab==="Factors"&&<FactorRisk model={model} total={total}/>} {tab==="Positions"&&<PositionRisk holdings={holdings} total={total} analytics={analytics} onSelectTicker={onSelectTicker}/>} {tab==="Correlations"&&<CorrelationAnalysis payload={payload} holdings={holdings} startDate={analytics.startDate} endDate={analytics.endDate}/>}</>}
+function RiskWorkspace({ tab, model, total, holdings, analytics, payload, onSelectTicker }: { tab:"Factors"|"Positions"|"Correlations"; setTab:(tab:"Factors"|"Positions"|"Correlations")=>void; model:FactorModelAnalytics; total:number; holdings:Holding[]; analytics:PortfolioAnalytics; payload:MarketPayload; onSelectTicker:(ticker:string)=>void }) {return <>{tab==="Factors"&&<FactorRisk model={model} total={total}/>} {tab==="Positions"&&<PositionRisk holdings={holdings} total={total} analytics={analytics} onSelectTicker={onSelectTicker}/>} {tab==="Correlations"&&<CorrelationAnalysis payload={payload} holdings={holdings} startDate={analytics.startDate} endDate={analytics.endDate}/>}</>}
 
-function PerformanceWorkspace({ tab, setTab, total, analytics, model, payload, holdings, onSelectTicker, onExploreCorrelations }: { tab:"Overview"|"Event Analysis"; setTab:(tab:"Overview"|"Event Analysis")=>void; total:number; analytics:PortfolioAnalytics; model:FactorModelAnalytics; payload:MarketPayload; holdings:Holding[]; onSelectTicker:(ticker:string)=>void; onExploreCorrelations:(startDate:string,endDate:string)=>void }) {return <><WorkspaceTabs items={["Overview","Event Analysis"] as const} selected={tab} onSelect={setTab}/>{tab==="Overview"?<Performance total={total} analytics={analytics} model={model} onSelectTicker={onSelectTicker}/>:<EventAnalysis payload={payload} holdings={holdings} total={total} onSelectTicker={onSelectTicker} onExploreCorrelations={onExploreCorrelations}/>}</>}
+function PerformanceWorkspace({ tab, total, analytics, model, payload, holdings, onSelectTicker, onExploreCorrelations }: { tab:"Overview"|"Event Analysis"; setTab:(tab:"Overview"|"Event Analysis")=>void; total:number; analytics:PortfolioAnalytics; model:FactorModelAnalytics; payload:MarketPayload; holdings:Holding[]; onSelectTicker:(ticker:string)=>void; onExploreCorrelations:(startDate:string,endDate:string)=>void }) {return <>{tab==="Overview"?<Performance total={total} analytics={analytics} model={model} onSelectTicker={onSelectTicker}/>:<EventAnalysis payload={payload} holdings={holdings} total={total} onSelectTicker={onSelectTicker} onExploreCorrelations={onExploreCorrelations}/>}</>}
 
 function StrategyExposureChart({ strategy, targetVolatility, targetBeta }: { strategy: StrategyBacktestAnalytics; targetVolatility: number; targetBeta: number }) {
   const points=strategy.exposures;
@@ -437,7 +437,7 @@ export default function Home() {
   const availableStartDate = marketData?.factorStartDate ?? marketData?.series.SPY?.points[0]?.date ?? "";
   const availableEndDate = marketData?.asOf ?? marketData?.series.SPY?.points.at(-1)?.date ?? "";
   const viewCopy: Record<View, [string, string]> = {
-    "Overview": ["Portfolio overview", "A dollar-first view of exposure, risk and historical performance."],
+    "Overview": ["See what is driving the portfolio", "Separate performance associated with market, style and sector factors from the idiosyncratic return that remains."],
     "Compare": ["Portfolio comparison", "Compare the current portfolio with its saved baseline across allocation, risk, factors and historical performance."],
     "Strategy Analysis": ["Strategy analysis", "Test a point-in-time portfolio that rebalances toward explicit risk targets."],
     "Risk Analysis": ["Risk analysis", "Understand factor exposure, position-level risk and changing correlations in one workspace."],
@@ -447,12 +447,17 @@ export default function Home() {
     "Methodology": ["Methodology", "Transparent inputs, explainable models and clearly defined limits."],
     "Project Brief": ["Project brief", "The problem, product decisions and quantitative framework behind FactorScope."],
   };
+  const primarySection = view === "Overview" || view === "Performance" ? "Portfolio" : view === "Risk Analysis" || view === "Security Analysis" ? "Risk & Attribution" : view === "Compare" || view === "Strategy Analysis" || view === "Scenario Lab" ? "Strategy Lab" : "About";
+  const portfolioTab = view === "Performance" ? performanceTab === "Event Analysis" ? "Events" : "Performance" : "Overview";
+  const analysisTab = view === "Security Analysis" ? "Security" : riskTab;
+  const strategyTab = view === "Compare" ? "Compare" : view === "Strategy Analysis" ? "Dynamic Strategy" : "Scenarios";
+  const aboutTab = view === "Project Brief" ? "Project Brief" : "Methodology";
 
   return (
     <main className="app-shell">
       <header className="topbar">
         <div className="brand"><span className="brandmark">F</span><span>FactorScope</span><em>PORTFOLIO INTELLIGENCE</em></div>
-        <div className="top-meta"><span className={`live-dot ${dataError ? "error-dot" : missingHoldings.length ? "warning-dot" : ""}`} /> {loading ? "Loading Yahoo data" : dataError ? "Data connection issue" : missingHoldings.length ? `${missingHoldings.length} ticker${missingHoldings.length>1?"s":""} unavailable` : `Yahoo Finance · through ${marketData?.asOf ?? "latest"}`} <b>•</b> Daily adjusted <button onClick={() => setView("Project Brief")}>Project brief ↗</button><div className="avatar">FS</div></div>
+        <div className="top-meta"><span className={`live-dot ${dataError ? "error-dot" : missingHoldings.length ? "warning-dot" : ""}`} /> {loading ? "Loading Yahoo data" : dataError ? "Data connection issue" : missingHoldings.length ? `${missingHoldings.length} ticker${missingHoldings.length>1?"s":""} unavailable` : `Yahoo Finance · through ${marketData?.asOf ?? "latest"}`} <b>•</b> Daily adjusted <div className="avatar">FS</div></div>
       </header>
 
       <aside className="sidebar">
@@ -463,16 +468,11 @@ export default function Home() {
           <div className="portfolio-total">{money(total)}</div><div className="muted">{holdings.filter(h => h.ticker !== "CASH").length} positions · USD</div>
           <button className="edit-btn" onClick={() => setEditing(current=>!current)}>{editing ? "Close editor" : "Edit portfolio"}</button>
         </section>
-        <nav>
-          <button onClick={()=>setView("Overview")} className={view==="Overview"?"active":""}><Icon name="grid"/>Overview</button>
-          <button onClick={()=>setView("Compare")} className={view==="Compare"?"active":""}><Icon name="compare"/>Compare</button>
-          <button onClick={()=>setView("Strategy Analysis")} className={view==="Strategy Analysis"?"active":""}><Icon name="strategy"/>Strategy Analysis<span className="new">BETA</span></button>
-          <div className={`nav-group ${view==="Risk Analysis"?"group-active":""}`}><button className="nav-parent" onClick={()=>{setView("Risk Analysis");setRiskTab("Factors")}}><Icon name="factor"/>Risk Analysis</button><div className="nav-children">{(["Factors","Positions","Correlations"] as const).map(tab=><button key={tab} className={view==="Risk Analysis"&&riskTab===tab?"active":""} onClick={()=>{setView("Risk Analysis");setRiskTab(tab)}}>{tab}</button>)}</div></div>
-          <button onClick={()=>{setView("Security Analysis");if(!selectedTicker)setSelectedTicker(holdings.find(item=>item.ticker!=="CASH")?.ticker??null)}} className={view==="Security Analysis"?"active":""}><Icon name="security"/>Security Analysis</button>
-          <div className={`nav-group ${view==="Performance"?"group-active":""}`}><button className="nav-parent" onClick={()=>{setView("Performance");setPerformanceTab("Overview")}}><Icon name="performance"/>Performance</button><div className="nav-children">{(["Overview","Event Analysis"] as const).map(tab=><button key={tab} className={view==="Performance"&&performanceTab===tab?"active":""} onClick={()=>{setView("Performance");setPerformanceTab(tab)}}>{tab}{tab==="Event Analysis"&&<span className="new">EVENTS</span>}</button>)}</div></div>
-          <button onClick={()=>setView("Scenario Lab")} className={view==="Scenario Lab"?"active":""}><Icon name="scenario"/>Scenario Lab</button>
-          <button onClick={()=>setView("Methodology")} className={view==="Methodology"?"active":""}><Icon name="method"/>Methodology</button>
-          <button onClick={()=>setView("Project Brief")} className={view==="Project Brief"?"active":""}><Icon name="brief"/>Project Brief</button>
+        <nav className="primary-navigation" aria-label="Primary navigation">
+          <button onClick={()=>setView("Overview")} className={primarySection==="Portfolio"?"active":""}><Icon name="grid"/><span><b>Portfolio</b><small>Overview, performance &amp; events</small></span></button>
+          <button onClick={()=>{setView("Risk Analysis");setRiskTab("Factors")}} className={primarySection==="Risk & Attribution"?"active":""}><Icon name="factor"/><span><b>Risk &amp; Attribution</b><small>Factors, positions &amp; correlation</small></span></button>
+          <button onClick={()=>setView("Compare")} className={primarySection==="Strategy Lab"?"active":""}><Icon name="strategy"/><span><b>Strategy Lab</b><small>Compare, construct &amp; stress</small></span></button>
+          <button onClick={()=>setView("Methodology")} className={primarySection==="About"?"active":""}><Icon name="method"/><span><b>About</b><small>Methodology &amp; project brief</small></span></button>
         </nav>
         <section className="sidebar-actions">
           <label className="upload"><Icon name="upload" /> Upload CSV<input type="file" accept=".csv" onChange={upload} /></label>
@@ -493,9 +493,14 @@ export default function Home() {
 
         <div className={`prototype-note ${dataError ? "prototype-error" : missingHoldings.length ? "prototype-warning" : ""}`}><span>{dataError ? "DATA ISSUE" : missingHoldings.length ? "PARTIAL DATA" : "LIVE DEMO"}</span><p>{dataError ? `${dataError} The interface remains available; retry the connection when ready.` : missingHoldings.length ? `No usable Yahoo history for ${missingHoldings.join(", ")}. Analytics exclude those positions and retain their value in portfolio cash.` : `USD portfolio analytics calculated from Yahoo Finance daily adjusted prices${marketData?.asOf ? ` through ${marketData.asOf}` : ""}.`}</p>{dataError && <button onClick={loadMarketData}>Retry</button>}</div>
         <div className="page-head">
-          <div><span className="kicker">FACTORScope / {view.toUpperCase()}</span><h1>{viewCopy[view][0]}</h1><p>{viewCopy[view][1]}</p></div>
+          <div><span className="kicker">{view === "Overview" ? "LIVE PORTFOLIO INTELLIGENCE" : `FACTORSCOPE / ${primarySection.toUpperCase()}`}</span><h1>{viewCopy[view][0]}</h1><p>{viewCopy[view][1]}</p></div>
           {view !== "Project Brief" && !(view === "Performance" && performanceTab === "Event Analysis") && <div className="date-control"><span>ANALYSIS PERIOD</span><label><small>FROM</small><input type="date" aria-label="Analysis start date" min={availableStartDate} max={analysisEnd || availableEndDate} value={analysisStart} disabled={!availableStartDate} onChange={(event)=>setAnalysisStart(event.target.value)} /></label><i>→</i><label><small>TO</small><input type="date" aria-label="Analysis end date" min={analysisStart || availableStartDate} max={availableEndDate} value={analysisEnd} disabled={!availableEndDate} onChange={(event)=>setAnalysisEnd(event.target.value)} /></label></div>}
         </div>
+
+        {primarySection === "Portfolio" && <div className="section-tabs" role="tablist" aria-label="Portfolio views">{(["Overview","Performance","Events"] as const).map(tab=><button key={tab} role="tab" aria-selected={portfolioTab===tab} className={portfolioTab===tab?"active":""} onClick={()=>{if(tab==="Overview")setView("Overview");else{setView("Performance");setPerformanceTab(tab==="Events"?"Event Analysis":"Overview")}}}>{tab}</button>)}</div>}
+        {primarySection === "Risk & Attribution" && <div className="section-tabs" role="tablist" aria-label="Risk and attribution views">{(["Factors","Positions","Correlations","Security"] as const).map(tab=><button key={tab} role="tab" aria-selected={analysisTab===tab} className={analysisTab===tab?"active":""} onClick={()=>{if(tab==="Security"){setView("Security Analysis");if(!selectedTicker)setSelectedTicker(holdings.find(item=>item.ticker!=="CASH")?.ticker??null)}else{setView("Risk Analysis");setRiskTab(tab)}}}>{tab}</button>)}</div>}
+        {primarySection === "Strategy Lab" && <div className="section-tabs" role="tablist" aria-label="Strategy lab views">{(["Compare","Dynamic Strategy","Scenarios"] as const).map(tab=><button key={tab} role="tab" aria-selected={strategyTab===tab} className={strategyTab===tab?"active":""} onClick={()=>setView(tab==="Compare"?"Compare":tab==="Dynamic Strategy"?"Strategy Analysis":"Scenario Lab")}>{tab}</button>)}</div>}
+        {primarySection === "About" && <div className="section-tabs" role="tablist" aria-label="About FactorScope">{(["Methodology","Project Brief"] as const).map(tab=><button key={tab} role="tab" aria-selected={aboutTab===tab} className={aboutTab===tab?"active":""} onClick={()=>setView(tab)}>{tab}</button>)}</div>}
 
         {loading && !analytics && <DataLoading />}
         {!loading && !analytics && !dataError && <DataUnavailable />}
@@ -584,6 +589,9 @@ function Overview({ total, invested, holdings, analytics, decomposition, onSelec
   });
   const allocationGradient = sectorSlices.length ? `conic-gradient(${sectorSlices.map((item) => `${item.color} ${item.start}% ${item.end}%`).join(", ")})` : "#1a242b";
   const factorCurve = decomposition && decomposition.systematic.length === analytics.dates.length - 1 ? [1, ...decomposition.systematic.map((value) => 1 + value)] : null;
+  const observedReturn = decomposition?.observed.at(-1) ?? analytics.totalReturn;
+  const systematicReturn = decomposition?.systematic.at(-1) ?? 0;
+  const idiosyncraticReturn = decomposition?.idiosyncratic.at(-1) ?? observedReturn-systematicReturn;
   return <>
     <section className="metrics">
       <Metric label="PORTFOLIO VALUE" value={money(total)} sub={`${money(invested)} invested`} />
@@ -592,6 +600,7 @@ function Overview({ total, invested, holdings, analytics, decomposition, onSelec
       <Metric label="MAX DRAWDOWN" value={pct(analytics.maxDrawdown * 100)} sub={`${analytics.startDate} to ${analytics.endDate}`} tone="red" />
       <Metric label="CASH BALANCE" value={money(total-invested)} sub={`${(((total-invested)/total)*100).toFixed(1)}% of portfolio`} tone="cyan" />
     </section>
+    {decomposition && <article className="panel overview-decomposition"><PanelTitle title="Return anatomy" meta="Common factors + idiosyncratic return = observed portfolio return"/><div className="decomposition-answer-strip"><div><span>OBSERVED RETURN</span><strong>{pct(observedReturn*100)}</strong><small>What the portfolio delivered</small></div><div><span>COMMON-FACTOR RETURN</span><strong>{pct(systematicReturn*100)}</strong><small>Market, style and sector effects</small></div><div className="idio-answer"><span>IDIOSYNCRATIC RETURN</span><strong>{pct(idiosyncraticReturn*100)}</strong><small>The remainder beyond common factors</small></div></div><DecompositionChart decomposition={decomposition}/></article>}
     <section className="dashboard-grid">
       <article className="panel performance-panel"><PanelTitle title="Historical replay" meta={`${analytics.startDate} — ${analytics.endDate}`} />
         <PerformanceChart portfolio={analytics.curve} benchmark={factorCurve ?? analytics.benchmarkCurve} tertiary={factorCurve ? analytics.benchmarkCurve : undefined} dates={analytics.dates} startDate={analytics.startDate} endDate={analytics.endDate} secondaryLabel={factorCurve ? "Factor benchmark (fitted)" : "S&P 500"} tertiaryLabel="S&P 500 (market reference)" definition={factorCurve ? "Growth of $1 from current dollar allocations. The fitted factor benchmark is the cumulative return explained in-sample by market, style and sector factors; the gap to the portfolio is idiosyncratic. SPY is retained as an investable market reference, not the sole benchmark." : "Growth of $1 invested at the start of the period. Current dollar allocations are held buy-and-hold; cash earns 0%."} />

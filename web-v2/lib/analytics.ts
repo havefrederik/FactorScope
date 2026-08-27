@@ -42,7 +42,7 @@ export type PortfolioAnalytics = {
 };
 
 export type StrategyRebalanceFrequency = "Weekly" | "Monthly";
-export type CovarianceModel = "CM-IEWMA" | "Rolling 126-day";
+export type CovarianceModel = "CM-IEWMA";
 export type StrategyBacktestConfig = {
   frequency: StrategyRebalanceFrequency;
   targetVolatility: number;
@@ -52,7 +52,6 @@ export type StrategyBacktestConfig = {
   endDate?: string;
   lookback?: number;
   transactionCostBps?: number;
-  covarianceModel?: CovarianceModel;
 };
 export type StrategyExposurePoint = {
   date: string;
@@ -339,6 +338,7 @@ function annualizedSharpe(dailyReturns: number[]) {
 const cmIewmaPairs = [[10, 21], [21, 63], [63, 125], [125, 250], [250, 500]] as const;
 const cmIewmaWindow = 10;
 const cmIewmaWarmup = 500;
+const cmIewmaMinimumPeriods = 63;
 
 type CovarianceExpertSnapshot = { covariance: number[][] };
 type PrecisionEvaluation = { factors: number[][][]; realizedReturn: number[] };
@@ -381,20 +381,6 @@ function combineMatrices(matrices: number[][][], weights: number[]) {
   return matrices[0].map((row, i) => row.map((_, j) => matrices.reduce((sum, matrix, index) => sum + weights[index] * matrix[i][j], 0)));
 }
 
-function projectSimplex(values: number[]) {
-  const sorted = [...values].sort((a, b) => b - a);
-  let cumulative = 0;
-  let threshold = 0;
-  for (let index = 0; index < sorted.length; index++) {
-    cumulative += sorted[index];
-    const candidate = (cumulative - 1) / (index + 1);
-    if (index === sorted.length - 1 || sorted[index + 1] <= candidate) { threshold = candidate; break; }
-  }
-  const projected = values.map((value) => Math.max(0, value - threshold));
-  const total = projected.reduce((sum, value) => sum + value, 0);
-  return total > 0 ? projected.map((value) => value / total) : values.map(() => 1 / values.length);
-}
-
 function combinationObjective(evaluations: PrecisionEvaluation[], weights: number[]) {
   return evaluations.reduce((total, evaluation) => {
     const combined = combineMatrices(evaluation.factors, weights);
@@ -404,31 +390,58 @@ function combinationObjective(evaluations: PrecisionEvaluation[], weights: numbe
   }, 0) / Math.max(evaluations.length, 1);
 }
 
-function fitCombinationWeights(evaluations: PrecisionEvaluation[]) {
+function combinationDerivatives(evaluations: PrecisionEvaluation[], weights: number[]) {
   const expertCount = cmIewmaPairs.length;
-  if (!evaluations.length) return Array(expertCount).fill(1 / expertCount);
-  let weights = Array(expertCount).fill(1 / expertCount);
+  const gradient = Array(expertCount).fill(0);
+  const hessian = Array.from({ length: expertCount }, () => Array(expertCount).fill(0));
+  evaluations.forEach((evaluation) => {
+    const combined = combineMatrices(evaluation.factors, weights);
+    const transformed = evaluation.factors.map((factor) => multiplyTransposeVector(factor, evaluation.realizedReturn));
+    const combinedReturn = transformed[0].map((_, asset) => transformed.reduce((sum, values, expert) => sum + weights[expert] * values[asset], 0));
+    for (let first = 0; first < expertCount; first++) {
+      const diagonalGradient = evaluation.factors[first].reduce((sum, row, asset) => sum + row[asset] / Math.max(combined[asset][asset], 1e-12), 0);
+      gradient[first] += diagonalGradient - transformed[first].reduce((sum, value, asset) => sum + value * combinedReturn[asset], 0);
+      for (let second = 0; second < expertCount; second++) {
+        const diagonalCurvature = evaluation.factors[first].reduce((sum, row, asset) => sum + row[asset] * evaluation.factors[second][asset][asset] / Math.max(combined[asset][asset] ** 2, 1e-24), 0);
+        const quadraticCurvature = transformed[first].reduce((sum, value, asset) => sum + value * transformed[second][asset], 0);
+        hessian[first][second] -= diagonalCurvature + quadraticCurvature;
+      }
+    }
+  });
+  const scale = 1 / Math.max(evaluations.length, 1);
+  return { gradient: gradient.map((value) => value * scale), hessian: hessian.map((row) => row.map((value) => value * scale)) };
+}
+
+function fitCombinationFace(evaluations: PrecisionEvaluation[], active: number[]) {
+  const expertCount = cmIewmaPairs.length;
+  if (active.length === 1) return Array.from({ length: expertCount }, (_, index) => index === active[0] ? 1 : 0);
+  let weights = Array(expertCount).fill(0);
+  active.forEach((expert) => { weights[expert] = 1 / active.length; });
   let objective = combinationObjective(evaluations, weights);
-  for (let iteration = 0; iteration < 160; iteration++) {
-    const gradient = Array(expertCount).fill(0);
-    evaluations.forEach((evaluation) => {
-      const combined = combineMatrices(evaluation.factors, weights);
-      const combinedReturn = multiplyTransposeVector(combined, evaluation.realizedReturn);
-      evaluation.factors.forEach((factor, expert) => {
-        const factorReturn = multiplyTransposeVector(factor, evaluation.realizedReturn);
-        const diagonalGradient = factor.reduce((sum, row, index) => sum + row[index] / Math.max(combined[index][index], 1e-12), 0);
-        const quadraticGradient = factorReturn.reduce((sum, value, index) => sum + value * combinedReturn[index], 0);
-        gradient[expert] += (diagonalGradient - quadraticGradient) / evaluations.length;
-      });
+  const anchor = active.at(-1)!;
+  const free = active.slice(0, -1);
+  for (let iteration = 0; iteration < 80; iteration++) {
+    const { gradient, hessian } = combinationDerivatives(evaluations, weights);
+    const reducedGradient = free.map((expert) => gradient[expert] - gradient[anchor]);
+    if (Math.sqrt(reducedGradient.reduce((sum, value) => sum + value ** 2, 0)) < 1e-9) break;
+    const reducedHessian = free.map((first) => free.map((second) =>
+      hessian[first][second] - hessian[first][anchor] - hessian[anchor][second] + hessian[anchor][anchor],
+    ));
+    const inverse = matrixInverse(reducedHessian.map((row, index) => row.map((value, column) => value - (index === column ? 1e-10 : 0))));
+    if (!inverse) break;
+    const freeStep = inverse.map((row) => -row.reduce((sum, value, index) => sum + value * reducedGradient[index], 0));
+    const direction = Array(expertCount).fill(0);
+    free.forEach((expert, index) => { direction[expert] = freeStep[index]; });
+    direction[anchor] = -freeStep.reduce((sum, value) => sum + value, 0);
+    let step = 1;
+    active.forEach((expert) => {
+      if (direction[expert] < 0) step = Math.min(step, .99 * weights[expert] / -direction[expert]);
     });
-    const centered = gradient.map((value) => value - mean(gradient));
-    if (Math.sqrt(centered.reduce((sum, value) => sum + value ** 2, 0)) < 1e-7) break;
-    let step = .08 / Math.sqrt(iteration + 1);
     let accepted = false;
-    for (let lineSearch = 0; lineSearch < 14; lineSearch++) {
-      const candidate = projectSimplex(weights.map((weight, index) => weight + step * centered[index]));
+    for (let lineSearch = 0; lineSearch < 30; lineSearch++) {
+      const candidate = weights.map((weight, expert) => weight + step * direction[expert]);
       const candidateObjective = combinationObjective(evaluations, candidate);
-      if (candidateObjective >= objective - 1e-10) {
+      if (candidateObjective >= objective - 1e-12) {
         weights = candidate;
         objective = candidateObjective;
         accepted = true;
@@ -436,14 +449,28 @@ function fitCombinationWeights(evaluations: PrecisionEvaluation[]) {
       }
       step *= .5;
     }
-    if (!accepted) break;
+    if (!accepted || Math.sqrt(direction.reduce((sum, value) => sum + (step * value) ** 2, 0)) < 1e-10) break;
   }
   return weights;
 }
 
+function fitCombinationWeights(evaluations: PrecisionEvaluation[]) {
+  const expertCount = cmIewmaPairs.length;
+  if (!evaluations.length) return Array(expertCount).fill(1 / expertCount);
+  let best = Array(expertCount).fill(1 / expertCount);
+  let bestObjective = -Infinity;
+  for (let mask = 1; mask < 2 ** expertCount; mask++) {
+    const active = Array.from({ length: expertCount }, (_, expert) => expert).filter((expert) => mask & (1 << expert));
+    const candidate = fitCombinationFace(evaluations, active);
+    const objective = combinationObjective(evaluations, candidate);
+    if (objective > bestObjective) { best = candidate; bestObjective = objective; }
+  }
+  return best.map((weight) => weight < 1e-9 ? 0 : weight);
+}
+
 // Browser-safe reimplementation of Johansson et al.'s Apache-2.0 cvxcovariance
 // reference method: five IEWMA experts, likelihood combination, and a 10-day window.
-function buildIewmaExpertSnapshots(assetReturns: number[][]) {
+export function buildIewmaExpertSnapshots(assetReturns: number[][]) {
   const periods = Math.min(...assetReturns.map((series) => series.length));
   const assets = assetReturns.length;
   return cmIewmaPairs.map(([volatilityHalfLife, correlationHalfLife], expertIndex) => {
@@ -454,20 +481,23 @@ function buildIewmaExpertSnapshots(assetReturns: number[][]) {
     const snapshots: CovarianceExpertSnapshot[] = [];
     for (let period = 0; period < periods; period++) {
       const realized = assetReturns.map((series) => series[period]);
-      if (period === 0) variances = realized.map((value) => Math.max(value ** 2, 1e-8));
+      if (period === 0) variances = realized.map((value) => value ** 2);
       else {
         const adjustment = (1 - volatilityBeta) / Math.max(1 - volatilityBeta ** (period + 1), 1e-12);
         variances = variances.map((value, index) => value + adjustment * (realized[index] ** 2 - value));
       }
       const volatility = variances.map((value) => Math.sqrt(Math.max(value, 1e-12)));
-      const standardized = realized.map((value, index) => Math.max(-4.2, Math.min(4.2, value / volatility[index])));
+      const covarianceAge = period - (cmIewmaMinimumPeriods - 1);
+      const standardized = realized.map((value, index) => value / volatility[index]);
       const outer = standardized.map((first) => standardized.map((second) => first * second));
-      if (period === 0) standardizedCovariance = outer;
-      else {
-        const adjustment = (1 - correlationBeta) / Math.max(1 - correlationBeta ** (period + 1), 1e-12);
+      if (covarianceAge === 0) standardizedCovariance = outer;
+      else if (covarianceAge > 0) {
+        const adjustment = (1 - correlationBeta) / Math.max(1 - correlationBeta ** (covarianceAge + 1), 1e-12);
         standardizedCovariance = standardizedCovariance.map((row, i) => row.map((value, j) => value + adjustment * (outer[i][j] - value)));
       }
-      const correlation = standardizedCovariance.map((row, i) => row.map((value, j) => value / Math.sqrt(Math.max(standardizedCovariance[i][i] * standardizedCovariance[j][j], 1e-16))));
+      const correlation = covarianceAge >= 0
+        ? standardizedCovariance.map((row, i) => row.map((value, j) => value / Math.sqrt(Math.max(standardizedCovariance[i][i] * standardizedCovariance[j][j], 1e-16))))
+        : standardizedCovariance.map((row, i) => row.map((_, j) => i === j ? 1 : 0));
       const covarianceMatrix = correlation.map((row, i) => row.map((value, j) => value * volatility[i] * volatility[j]));
       if (expertIndex === 0) covarianceMatrix.forEach((row, index) => { row[index] *= 1.05; });
       snapshots.push({ covariance: covarianceMatrix });
@@ -476,9 +506,7 @@ function buildIewmaExpertSnapshots(assetReturns: number[][]) {
   });
 }
 
-function createCombinedIewmaPredictor(assetReturns: number[][]) {
-  const experts = buildIewmaExpertSnapshots(assetReturns);
-  const precisionCache = new Map<string, number[][]>();
+function forecastFromIewmaExperts(assetReturns: number[][], experts: CovarianceExpertSnapshot[][], lastObservedPeriod: number, precisionCache = new Map<string, number[][]>()) {
   const precisionAt = (expert: number, period: number) => {
     const key = `${expert}:${period}`;
     const cached = precisionCache.get(key);
@@ -487,22 +515,36 @@ function createCombinedIewmaPredictor(assetReturns: number[][]) {
     precisionCache.set(key, precision);
     return precision;
   };
+  const firstEvaluation = Math.max(1, lastObservedPeriod - cmIewmaWindow + 1);
+  const evaluations: PrecisionEvaluation[] = [];
+  for (let realizedPeriod = firstEvaluation; realizedPeriod <= lastObservedPeriod; realizedPeriod++) {
+    evaluations.push({
+      factors: cmIewmaPairs.map((_, expert) => precisionAt(expert, realizedPeriod - 1)),
+      realizedReturn: assetReturns.map((series) => series[realizedPeriod]),
+    });
+  }
+  const weights = fitCombinationWeights(evaluations);
+  const combinedPrecisionFactor = combineMatrices(cmIewmaPairs.map((_, expert) => precisionAt(expert, lastObservedPeriod)), weights);
+  const precision = combinedPrecisionFactor.map((row) => row.map((_, j) => row.reduce((sum, value, index) => sum + value * combinedPrecisionFactor[j][index], 0)));
+  const covarianceMatrix = safeMatrixInverse(precision);
+  return {
+    covarianceMatrix,
+    weights: weights.map((weight, index) => ({ label: `${cmIewmaPairs[index][0]}/${cmIewmaPairs[index][1]}d`, weight })),
+  };
+}
+
+export function forecastCombinedIewmaCovariance(assetReturns: number[][], lastObservedPeriod: number) {
+  return forecastFromIewmaExperts(assetReturns, buildIewmaExpertSnapshots(assetReturns), lastObservedPeriod);
+}
+
+function createCombinedIewmaPredictor(assetReturns: number[][]) {
+  const experts = buildIewmaExpertSnapshots(assetReturns);
+  const precisionCache = new Map<string, number[][]>();
   return (lastObservedPeriod: number) => {
-    const firstEvaluation = Math.max(1, lastObservedPeriod - cmIewmaWindow + 1);
-    const evaluations: PrecisionEvaluation[] = [];
-    for (let realizedPeriod = firstEvaluation; realizedPeriod <= lastObservedPeriod; realizedPeriod++) {
-      evaluations.push({
-        factors: cmIewmaPairs.map((_, expert) => precisionAt(expert, realizedPeriod - 1)),
-        realizedReturn: assetReturns.map((series) => series[realizedPeriod]),
-      });
-    }
-    const weights = fitCombinationWeights(evaluations);
-    const combinedPrecisionFactor = combineMatrices(cmIewmaPairs.map((_, expert) => precisionAt(expert, lastObservedPeriod)), weights);
-    const precision = combinedPrecisionFactor.map((row) => row.map((_, j) => row.reduce((sum, value, index) => sum + value * combinedPrecisionFactor[j][index], 0)));
-    const covarianceMatrix = safeMatrixInverse(precision).map((row) => row.map((value) => value * 252));
+    const forecast = forecastFromIewmaExperts(assetReturns, experts, lastObservedPeriod, precisionCache);
     return {
-      covarianceMatrix,
-      weights: weights.map((weight, index) => ({ label: `${cmIewmaPairs[index][0]}/${cmIewmaPairs[index][1]}d`, weight })),
+      ...forecast,
+      covarianceMatrix: forecast.covarianceMatrix.map((row) => row.map((value) => value * 252)),
     };
   };
 }
@@ -544,8 +586,8 @@ export function buildRiskTargetStrategy(payload: MarketPayload, holdings: Analyt
   const benchmark = payload.series.SPY;
   const lookback = Math.max(60, config.lookback ?? 126);
   const transactionCostBps = Math.max(0, config.transactionCostBps ?? 10);
-  const covarianceModel = config.covarianceModel ?? "CM-IEWMA";
-  const covarianceWarmup = covarianceModel === "CM-IEWMA" ? cmIewmaWarmup : lookback;
+  const covarianceModel: CovarianceModel = "CM-IEWMA";
+  const covarianceWarmup = cmIewmaWarmup;
   if (!active.length || !benchmark || total <= 0) return null;
 
   const maps = active.map((holding) => new Map(payload.series[holding.ticker].points.map((point) => [point.date, point.close])));
@@ -561,7 +603,7 @@ export function buildRiskTargetStrategy(payload: MarketPayload, holdings: Analyt
   const benchmarkPrices = allDates.map((date) => benchmarkMap.get(date)!);
   const assetReturns = prices.map(returns);
   const benchmarkDailyReturns = returns(benchmarkPrices);
-  const combinedIewmaPredictor = covarianceModel === "CM-IEWMA" ? createCombinedIewmaPredictor(assetReturns) : null;
+  const combinedIewmaPredictor = createCombinedIewmaPredictor(assetReturns);
   const baseWeights = active.map((holding) => Math.max(0, holding.value / total));
   const baseInvestedWeight = Math.min(1, baseWeights.reduce((sum, weight) => sum + weight, 0));
   let currentWeights = projectStrategyWeights(baseWeights, config.maxPosition);
@@ -595,14 +637,9 @@ export function buildRiskTargetStrategy(payload: MarketPayload, holdings: Analyt
       const estimationStart = Math.max(0, estimationEnd - lookback);
       const estimationReturns = assetReturns.map((series) => series.slice(estimationStart, estimationEnd));
       const marketEstimationReturns = benchmarkDailyReturns.slice(estimationStart, estimationEnd);
-      if (combinedIewmaPredictor) {
-        const prediction = combinedIewmaPredictor(estimationEnd - 1);
-        lastCovariance = prediction.covarianceMatrix;
-        lastCovarianceWeights = prediction.weights;
-      } else {
-        lastCovariance = estimationReturns.map((first) => estimationReturns.map((second) => covariance(first, second) * 252));
-        lastCovarianceWeights = [{ label: `${lookback}d window`, weight: 1 }];
-      }
+      const prediction = combinedIewmaPredictor(estimationEnd - 1);
+      lastCovariance = prediction.covarianceMatrix;
+      lastCovarianceWeights = prediction.weights;
       lastBetas = estimationReturns.map((series) => covariance(series, marketEstimationReturns) / Math.max(variance(marketEstimationReturns), 1e-12));
       const targetWeights = optimizeRiskTarget(currentWeights, lastCovariance, lastBetas, config.targetVolatility, config.targetBeta, config.maxPosition);
       const currentCash = 1 - currentWeights.reduce((sum, weight) => sum + weight, 0);
@@ -684,10 +721,10 @@ export function buildRiskTargetStrategy(payload: MarketPayload, holdings: Analyt
     exposures,
     finalWeights,
     covarianceModel,
-    covarianceModelLabel: covarianceModel === "CM-IEWMA" ? "Combined multiple IEWMA" : "Rolling sample covariance",
+    covarianceModelLabel: "Combined multiple IEWMA",
     covarianceExpertWeights,
     volatilityCalibrationGap: annualVolatility - averageEstimatedVolatility,
-    assumptions: { lookback, transactionCostBps, longOnly: true, pointInTime: true, covarianceModel, covarianceCombinationWindow: covarianceModel === "CM-IEWMA" ? cmIewmaWindow : 0, covarianceWarmup },
+    assumptions: { lookback, transactionCostBps, longOnly: true, pointInTime: true, covarianceModel, covarianceCombinationWindow: cmIewmaWindow, covarianceWarmup },
   };
 }
 

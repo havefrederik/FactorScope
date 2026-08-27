@@ -108,6 +108,32 @@ export type StrategyBacktestAnalytics = {
     covarianceWarmup: number;
   };
 };
+export type CovarianceForecastAnalytics = {
+  asOf: string;
+  horizon: "Next trading session";
+  observations: number;
+  tickers: string[];
+  covarianceMatrix: number[][];
+  correlationMatrix: number[][];
+  volatilities: number[];
+  expertWeights: StrategyExpertWeight[];
+  portfolioVolatility: number;
+  averageCorrelation: number;
+  strongestPair: { tickerA: string; tickerB: string; correlation: number } | null;
+  diversificationRatio: number;
+  securities: { ticker: string; portfolioWeight: number; volatility: number; riskShare: number }[];
+};
+export type RiskTargetSnapshot = {
+  asOf: string;
+  effective: "Next trading session";
+  estimatedVolatility: number;
+  beta: number;
+  investedWeight: number;
+  cashWeight: number;
+  currentCashWeight: number;
+  turnover: number;
+  weights: { ticker: string; currentWeight: number; targetWeight: number; change: number }[];
+};
 
 export type FactorAnalytics = { name: string; group: "Core" | "Style" | "Sector"; exposure: number; riskShare: number; annualRisk: number; returnAttribution: number };
 export type FactorLayerAnalytics = { name: "Market" | "Style" | "Sector" | "Idiosyncratic"; riskShare: number; returnAttribution: number };
@@ -537,6 +563,55 @@ export function forecastCombinedIewmaCovariance(assetReturns: number[][], lastOb
   return forecastFromIewmaExperts(assetReturns, buildIewmaExpertSnapshots(assetReturns), lastObservedPeriod);
 }
 
+export function buildCovarianceForecast(payload: MarketPayload, holdings: AnalyticsHolding[], asOf?: string): CovarianceForecastAnalytics | null {
+  const total = holdings.reduce((sum, holding) => sum + holding.value, 0);
+  const active = holdings.filter((holding) => holding.ticker !== "CASH" && holding.value !== 0 && payload.series[holding.ticker]);
+  if (!active.length || total <= 0) return null;
+  const cutoff = asOf || payload.asOf || payload.series[active[0].ticker]?.points.at(-1)?.date || "";
+  const priceMaps = active.map((holding) => new Map(payload.series[holding.ticker].points.filter((point) => point.date <= cutoff).map((point) => [point.date, point.close])));
+  const dates = [...priceMaps[0].keys()].filter((date) => priceMaps.every((map) => map.has(date))).sort();
+  const prices = priceMaps.map((map) => dates.map((date) => map.get(date)!));
+  const assetReturns = prices.map(returns);
+  const observations = Math.min(...assetReturns.map((series) => series.length));
+  if (observations <= cmIewmaWarmup) return null;
+  const forecast = forecastCombinedIewmaCovariance(assetReturns, observations - 1);
+  const covarianceMatrix = forecast.covarianceMatrix.map((row) => row.map((value) => value * 252));
+  const volatilities = covarianceMatrix.map((row, index) => Math.sqrt(Math.max(row[index], 0)));
+  const correlationMatrix = covarianceMatrix.map((row, first) => row.map((value, second) => value / Math.max(volatilities[first] * volatilities[second], 1e-12)));
+  const portfolioWeights = active.map((holding) => holding.value / total);
+  const covarianceWeights = covarianceMatrix.map((row) => row.reduce((sum, value, column) => sum + value * portfolioWeights[column], 0));
+  const portfolioVariance = Math.max(portfolioWeights.reduce((sum, weight, index) => sum + weight * covarianceWeights[index], 0), 0);
+  const portfolioVolatility = Math.sqrt(portfolioVariance);
+  const pairs: { tickerA: string; tickerB: string; correlation: number }[] = [];
+  for (let first = 0; first < active.length; first++) for (let second = first + 1; second < active.length; second++) {
+    pairs.push({ tickerA: active[first].ticker, tickerB: active[second].ticker, correlation: correlationMatrix[first][second] });
+  }
+  const averageCorrelation = mean(pairs.map((pair) => pair.correlation));
+  const strongestPair = pairs.sort((first, second) => Math.abs(second.correlation) - Math.abs(first.correlation))[0] ?? null;
+  const weightedStandaloneRisk = portfolioWeights.reduce((sum, weight, index) => sum + Math.abs(weight) * volatilities[index], 0);
+  const securities = active.map((holding, index) => ({
+    ticker: holding.ticker,
+    portfolioWeight: portfolioWeights[index],
+    volatility: volatilities[index],
+    riskShare: portfolioVariance > 1e-12 ? portfolioWeights[index] * covarianceWeights[index] / portfolioVariance : 0,
+  })).sort((first, second) => second.volatility - first.volatility);
+  return {
+    asOf: dates.at(-1)!,
+    horizon: "Next trading session",
+    observations,
+    tickers: active.map((holding) => holding.ticker),
+    covarianceMatrix,
+    correlationMatrix,
+    volatilities,
+    expertWeights: forecast.weights,
+    portfolioVolatility,
+    averageCorrelation,
+    strongestPair,
+    diversificationRatio: portfolioVolatility > 1e-12 ? weightedStandaloneRisk / portfolioVolatility : 0,
+    securities,
+  };
+}
+
 function createCombinedIewmaPredictor(assetReturns: number[][]) {
   const experts = buildIewmaExpertSnapshots(assetReturns);
   const precisionCache = new Map<string, number[][]>();
@@ -570,6 +645,39 @@ function optimizeRiskTarget(previousWeights: number[], covarianceMatrix: number[
     weights = projectStrategyWeights(weights.map((weight, index) => weight - step * gradient[index]), maxPosition);
   }
   return weights;
+}
+
+export function buildRiskTargetSnapshot(payload: MarketPayload, holdings: AnalyticsHolding[], forecast: CovarianceForecastAnalytics, config: Pick<StrategyBacktestConfig, "targetVolatility" | "targetBeta" | "maxPosition">): RiskTargetSnapshot | null {
+  const total = holdings.reduce((sum, holding) => sum + holding.value, 0);
+  const active = forecast.tickers.map((ticker) => holdings.find((holding) => holding.ticker === ticker)).filter((holding): holding is AnalyticsHolding => Boolean(holding));
+  const benchmark = payload.series.SPY;
+  if (!active.length || active.some((holding) => holding.value < 0) || total <= 0 || !benchmark) return null;
+  const priceMaps = active.map((holding) => new Map(payload.series[holding.ticker].points.filter((point) => point.date <= forecast.asOf).map((point) => [point.date, point.close])));
+  const benchmarkMap = new Map(benchmark.points.filter((point) => point.date <= forecast.asOf).map((point) => [point.date, point.close]));
+  const dates = [...benchmarkMap.keys()].filter((date) => priceMaps.every((map) => map.has(date))).sort();
+  if (dates.length < 127) return null;
+  const estimationDates = dates.slice(-127);
+  const assetReturns = priceMaps.map((map) => returns(estimationDates.map((date) => map.get(date)!)));
+  const marketReturns = returns(estimationDates.map((date) => benchmarkMap.get(date)!));
+  const betas = assetReturns.map((series) => covariance(series, marketReturns) / Math.max(variance(marketReturns), 1e-12));
+  const currentWeights = active.map((holding) => Math.max(0, holding.value / total));
+  const targetWeights = optimizeRiskTarget(currentWeights, forecast.covarianceMatrix, betas, config.targetVolatility, config.targetBeta, config.maxPosition);
+  const investedWeight = targetWeights.reduce((sum, weight) => sum + weight, 0);
+  const currentInvestedWeight = currentWeights.reduce((sum, weight) => sum + weight, 0);
+  const cashWeight = 1 - investedWeight;
+  const currentCashWeight = 1 - currentInvestedWeight;
+  const turnover = .5 * (targetWeights.reduce((sum, weight, index) => sum + Math.abs(weight - currentWeights[index]), 0) + Math.abs(cashWeight - currentCashWeight));
+  return {
+    asOf: forecast.asOf,
+    effective: "Next trading session",
+    estimatedVolatility: strategyPortfolioVolatility(targetWeights, forecast.covarianceMatrix),
+    beta: targetWeights.reduce((sum, weight, index) => sum + weight * betas[index], 0),
+    investedWeight,
+    cashWeight,
+    currentCashWeight,
+    turnover,
+    weights: active.map((holding, index) => ({ ticker: holding.ticker, currentWeight: currentWeights[index], targetWeight: targetWeights[index], change: targetWeights[index] - currentWeights[index] })),
+  };
 }
 
 function strategyRebalanceBucket(date: string, frequency: StrategyRebalanceFrequency) {

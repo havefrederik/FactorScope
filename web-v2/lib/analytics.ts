@@ -1,3 +1,5 @@
+import { solveConstrainedRiskAllocation } from "./risk-allocation.ts";
+
 export type PricePoint = { date: string; close: number };
 export type SymbolSeries = { requested: string; symbol: string; currency: string; exchange: string; instrumentType: string; points: PricePoint[] };
 export type MarketPayload = {
@@ -64,8 +66,9 @@ export type StrategyRebalancePoint = StrategyExposurePoint & {
   cost: number;
   largestPosition: string;
   largestWeight: number;
-  weights: { ticker: string; weight: number }[];
+  weights: { ticker: string; weight: number; riskBudget: number; riskContribution: number }[];
   covarianceWeights: StrategyExpertWeight[];
+  bindingConstraints: string[];
 };
 export type StrategyExpertWeight = { label: string; weight: number };
 export type StrategyBacktestAnalytics = {
@@ -106,6 +109,8 @@ export type StrategyBacktestAnalytics = {
     covarianceModel: CovarianceModel;
     covarianceCombinationWindow: number;
     covarianceWarmup: number;
+    riskAllocationRule: "Constrained risk allocation";
+    targetInterpretation: "Ceilings";
   };
 };
 export type CovarianceForecastAnalytics = {
@@ -132,7 +137,9 @@ export type RiskTargetSnapshot = {
   cashWeight: number;
   currentCashWeight: number;
   turnover: number;
-  weights: { ticker: string; currentWeight: number; targetWeight: number; change: number }[];
+  bindingConstraints: string[];
+  solverStatus: "Solved" | "Numerical fallback";
+  weights: { ticker: string; currentWeight: number; targetWeight: number; change: number; riskBudget: number; riskContribution: number }[];
 };
 
 export type FactorAnalytics = { name: string; group: "Core" | "Style" | "Sector"; exposure: number; riskShare: number; annualRisk: number; returnAttribution: number };
@@ -624,27 +631,9 @@ function createCombinedIewmaPredictor(assetReturns: number[][]) {
   };
 }
 
-function optimizeRiskTarget(previousWeights: number[], covarianceMatrix: number[][], betas: number[], targetVolatility: number, targetBeta: number, maxPosition: number) {
-  const riskyTotal = previousWeights.reduce((sum, weight) => sum + weight, 0);
-  const normalized = riskyTotal > 0 ? previousWeights.map((weight) => weight / riskyTotal) : previousWeights.map(() => 1 / Math.max(previousWeights.length, 1));
-  const fullyInvestedVolatility = strategyPortfolioVolatility(normalized, covarianceMatrix);
-  const startingScale = Math.min(1, targetVolatility / Math.max(fullyInvestedVolatility, 1e-6));
-  let weights = projectStrategyWeights(normalized.map((weight) => weight * startingScale), maxPosition);
-
-  for (let iteration = 0; iteration < 700; iteration++) {
-    const portfolioBeta = weights.reduce((sum, weight, index) => sum + weight * betas[index], 0);
-    const sigmaWeights = covarianceMatrix.map((row) => row.reduce((sum, value, column) => sum + value * weights[column], 0));
-    const portfolioVolatility = Math.sqrt(Math.max(weights.reduce((sum, weight, index) => sum + weight * sigmaWeights[index], 0), 1e-12));
-    const step = .016 / (1 + iteration / 180);
-    const gradient = weights.map((weight, index) =>
-      6 * (portfolioBeta - targetBeta) * betas[index]
-      + 160 * (portfolioVolatility - targetVolatility) * sigmaWeights[index] / portfolioVolatility
-      + .38 * (weight - previousWeights[index])
-      + .04 * weight,
-    );
-    weights = projectStrategyWeights(weights.map((weight, index) => weight - step * gradient[index]), maxPosition);
-  }
-  return weights;
+function portfolioRiskBudgets(weights: number[]) {
+  const total = weights.reduce((sum, weight) => sum + Math.max(weight, 0), 0);
+  return total > 0 ? weights.map((weight) => Math.max(weight, 0) / total) : weights.map(() => 1 / Math.max(weights.length, 1));
 }
 
 export function buildRiskTargetSnapshot(payload: MarketPayload, holdings: AnalyticsHolding[], forecast: CovarianceForecastAnalytics, config: Pick<StrategyBacktestConfig, "targetVolatility" | "targetBeta" | "maxPosition">): RiskTargetSnapshot | null {
@@ -661,7 +650,15 @@ export function buildRiskTargetSnapshot(payload: MarketPayload, holdings: Analyt
   const marketReturns = returns(estimationDates.map((date) => benchmarkMap.get(date)!));
   const betas = assetReturns.map((series) => covariance(series, marketReturns) / Math.max(variance(marketReturns), 1e-12));
   const currentWeights = active.map((holding) => Math.max(0, holding.value / total));
-  const targetWeights = optimizeRiskTarget(currentWeights, forecast.covarianceMatrix, betas, config.targetVolatility, config.targetBeta, config.maxPosition);
+  const allocation = solveConstrainedRiskAllocation({
+    covarianceMatrix: forecast.covarianceMatrix,
+    betas,
+    riskBudgets: portfolioRiskBudgets(currentWeights),
+    targetVolatility: config.targetVolatility,
+    targetBeta: config.targetBeta,
+    maxPosition: config.maxPosition,
+  });
+  const targetWeights = allocation.weights;
   const investedWeight = targetWeights.reduce((sum, weight) => sum + weight, 0);
   const currentInvestedWeight = currentWeights.reduce((sum, weight) => sum + weight, 0);
   const cashWeight = 1 - investedWeight;
@@ -676,7 +673,16 @@ export function buildRiskTargetSnapshot(payload: MarketPayload, holdings: Analyt
     cashWeight,
     currentCashWeight,
     turnover,
-    weights: active.map((holding, index) => ({ ticker: holding.ticker, currentWeight: currentWeights[index], targetWeight: targetWeights[index], change: targetWeights[index] - currentWeights[index] })),
+    bindingConstraints: allocation.bindingConstraints,
+    solverStatus: allocation.solverStatus,
+    weights: active.map((holding, index) => ({
+      ticker: holding.ticker,
+      currentWeight: currentWeights[index],
+      targetWeight: targetWeights[index],
+      change: targetWeights[index] - currentWeights[index],
+      riskBudget: allocation.riskBudgets[index],
+      riskContribution: allocation.riskContributions[index],
+    })),
   };
 }
 
@@ -713,8 +719,9 @@ export function buildRiskTargetStrategy(payload: MarketPayload, holdings: Analyt
   const benchmarkDailyReturns = returns(benchmarkPrices);
   const combinedIewmaPredictor = createCombinedIewmaPredictor(assetReturns);
   const baseWeights = active.map((holding) => Math.max(0, holding.value / total));
+  const riskBudgets = portfolioRiskBudgets(baseWeights);
   const baseInvestedWeight = Math.min(1, baseWeights.reduce((sum, weight) => sum + weight, 0));
-  let currentWeights = projectStrategyWeights(baseWeights, config.maxPosition);
+  let currentWeights = projectStrategyWeights(baseWeights, 1);
   if (currentWeights.reduce((sum, weight) => sum + weight, 0) > baseInvestedWeight && baseInvestedWeight > 0) {
     const scale = baseInvestedWeight / currentWeights.reduce((sum, weight) => sum + weight, 0);
     currentWeights = currentWeights.map((weight) => weight * scale);
@@ -749,7 +756,15 @@ export function buildRiskTargetStrategy(payload: MarketPayload, holdings: Analyt
       lastCovariance = prediction.covarianceMatrix;
       lastCovarianceWeights = prediction.weights;
       lastBetas = estimationReturns.map((series) => covariance(series, marketEstimationReturns) / Math.max(variance(marketEstimationReturns), 1e-12));
-      const targetWeights = optimizeRiskTarget(currentWeights, lastCovariance, lastBetas, config.targetVolatility, config.targetBeta, config.maxPosition);
+      const allocation = solveConstrainedRiskAllocation({
+        covarianceMatrix: lastCovariance,
+        betas: lastBetas,
+        riskBudgets,
+        targetVolatility: config.targetVolatility,
+        targetBeta: config.targetBeta,
+        maxPosition: config.maxPosition,
+      });
+      const targetWeights = allocation.weights;
       const currentCash = 1 - currentWeights.reduce((sum, weight) => sum + weight, 0);
       const targetCash = 1 - targetWeights.reduce((sum, weight) => sum + weight, 0);
       const turnover = .5 * (targetWeights.reduce((sum, weight, index) => sum + Math.abs(weight - currentWeights[index]), 0) + Math.abs(targetCash - currentCash));
@@ -769,8 +784,9 @@ export function buildRiskTargetStrategy(payload: MarketPayload, holdings: Analyt
         cost: total * curve.at(-1)! * costRate,
         largestPosition: active[largestIndex].ticker,
         largestWeight: currentWeights[largestIndex],
-        weights: active.map((holding, index) => ({ ticker: holding.ticker, weight: currentWeights[index] })).sort((first, second) => second.weight - first.weight),
+        weights: active.map((holding, index) => ({ ticker: holding.ticker, weight: currentWeights[index], riskBudget: allocation.riskBudgets[index], riskContribution: allocation.riskContributions[index] })).sort((first, second) => second.weight - first.weight),
         covarianceWeights: lastCovarianceWeights,
+        bindingConstraints: allocation.bindingConstraints,
       });
     }
 
@@ -832,7 +848,7 @@ export function buildRiskTargetStrategy(payload: MarketPayload, holdings: Analyt
     covarianceModelLabel: "Combined multiple IEWMA",
     covarianceExpertWeights,
     volatilityCalibrationGap: annualVolatility - averageEstimatedVolatility,
-    assumptions: { lookback, transactionCostBps, longOnly: true, pointInTime: true, covarianceModel, covarianceCombinationWindow: cmIewmaWindow, covarianceWarmup },
+    assumptions: { lookback, transactionCostBps, longOnly: true, pointInTime: true, covarianceModel, covarianceCombinationWindow: cmIewmaWindow, covarianceWarmup, riskAllocationRule: "Constrained risk allocation", targetInterpretation: "Ceilings" },
   };
 }
 

@@ -8,18 +8,30 @@ type View = "Overview" | "Compare" | "Strategy Analysis" | "Risk Analysis" | "Se
 type DemoKey = "equity" | "market-neutral";
 
 const equitySeed: Holding[] = [
-  { ticker: "AAPL", name: "Apple", sector: "Technology", value: 150000, beta: 1.14, vol: 24.8, risk: 16.2 },
-  { ticker: "MSFT", name: "Microsoft", sector: "Technology", value: 150000, beta: 1.06, vol: 22.1, risk: 14.8 },
-  { ticker: "JPM", name: "JPMorgan Chase", sector: "Financials", value: 100000, beta: 1.09, vol: 20.7, risk: 9.8 },
-  { ticker: "BRK.B", name: "Berkshire Hathaway", sector: "Financials", value: 100000, beta: 0.87, vol: 15.9, risk: 7.4 },
-  { ticker: "JNJ", name: "Johnson & Johnson", sector: "Healthcare", value: 70000, beta: 0.62, vol: 17.2, risk: 5.6 },
-  { ticker: "ABBV", name: "AbbVie", sector: "Healthcare", value: 70000, beta: 0.68, vol: 19.3, risk: 5.8 },
-  { ticker: "PG", name: "Procter & Gamble", sector: "Consumer Staples", value: 60000, beta: 0.55, vol: 15.4, risk: 4.4 },
-  { ticker: "WMT", name: "Walmart", sector: "Consumer Staples", value: 60000, beta: 0.54, vol: 18.1, risk: 4.6 },
-  { ticker: "COST", name: "Costco", sector: "Consumer Staples", value: 60000, beta: 0.83, vol: 19.4, risk: 4.8 },
-  { ticker: "XOM", name: "Exxon Mobil", sector: "Energy", value: 50000, beta: 0.88, vol: 23.4, risk: 4.9 },
-  { ticker: "NEE", name: "NextEra Energy", sector: "Utilities", value: 40000, beta: 0.58, vol: 22.0, risk: 3.7 },
-  { ticker: "CAT", name: "Caterpillar", sector: "Industrials", value: 50000, beta: 1.11, vol: 26.3, risk: 5.1 },
+  { ticker: "AAPL", name: "Apple", sector: "Technology", value: 40000, beta: 1.14, vol: 24.8, risk: 4.0 },
+  { ticker: "MSFT", name: "Microsoft", sector: "Technology", value: 40000, beta: 1.06, vol: 22.1, risk: 4.0 },
+  { ticker: "GOOGL", name: "Alphabet", sector: "Communication Services", value: 40000, beta: 1.02, vol: 25.0, risk: 4.0 },
+  { ticker: "META", name: "Meta Platforms", sector: "Communication Services", value: 40000, beta: 1.18, vol: 30.0, risk: 4.0 },
+  { ticker: "JPM", name: "JPMorgan Chase", sector: "Financials", value: 40000, beta: 1.09, vol: 20.7, risk: 4.0 },
+  { ticker: "BRK.B", name: "Berkshire Hathaway", sector: "Financials", value: 40000, beta: 0.87, vol: 15.9, risk: 4.0 },
+  { ticker: "JNJ", name: "Johnson & Johnson", sector: "Healthcare", value: 40000, beta: 0.62, vol: 17.2, risk: 4.0 },
+  { ticker: "ABBV", name: "AbbVie", sector: "Healthcare", value: 40000, beta: 0.68, vol: 19.3, risk: 4.0 },
+  { ticker: "UNH", name: "UnitedHealth", sector: "Healthcare", value: 40000, beta: 0.72, vol: 25.0, risk: 4.0 },
+  { ticker: "LLY", name: "Eli Lilly", sector: "Healthcare", value: 40000, beta: 0.55, vol: 27.0, risk: 4.0 },
+  { ticker: "PFE", name: "Pfizer", sector: "Healthcare", value: 40000, beta: 0.58, vol: 22.0, risk: 4.0 },
+  { ticker: "PG", name: "Procter & Gamble", sector: "Consumer Staples", value: 40000, beta: 0.55, vol: 15.4, risk: 4.0 },
+  { ticker: "WMT", name: "Walmart", sector: "Consumer Staples", value: 40000, beta: 0.54, vol: 18.1, risk: 4.0 },
+  { ticker: "COST", name: "Costco", sector: "Consumer Staples", value: 40000, beta: 0.83, vol: 19.4, risk: 4.0 },
+  { ticker: "KO", name: "Coca-Cola", sector: "Consumer Staples", value: 40000, beta: 0.58, vol: 15.5, risk: 4.0 },
+  { ticker: "PEP", name: "PepsiCo", sector: "Consumer Staples", value: 40000, beta: 0.54, vol: 17.0, risk: 4.0 },
+  { ticker: "XOM", name: "Exxon Mobil", sector: "Energy", value: 40000, beta: 0.88, vol: 23.4, risk: 4.0 },
+  { ticker: "CVX", name: "Chevron", sector: "Energy", value: 40000, beta: 0.84, vol: 21.1, risk: 4.0 },
+  { ticker: "CAT", name: "Caterpillar", sector: "Industrials", value: 40000, beta: 1.11, vol: 26.3, risk: 4.0 },
+  { ticker: "HON", name: "Honeywell", sector: "Industrials", value: 40000, beta: 0.86, vol: 20.4, risk: 4.0 },
+  { ticker: "NEE", name: "NextEra Energy", sector: "Utilities", value: 40000, beta: 0.58, vol: 22.0, risk: 4.0 },
+  { ticker: "DUK", name: "Duke Energy", sector: "Utilities", value: 40000, beta: 0.42, vol: 16.9, risk: 4.0 },
+  { ticker: "SO", name: "Southern Company", sector: "Utilities", value: 40000, beta: 0.48, vol: 17.5, risk: 4.0 },
+  { ticker: "MCD", name: "McDonald’s", sector: "Consumer Discretionary", value: 40000, beta: 0.63, vol: 18.5, risk: 4.0 },
   { ticker: "CASH", name: "Cash", sector: "Cash", value: 40000, beta: 0, vol: 0, risk: 0 },
 ];
 
@@ -392,7 +404,7 @@ export default function Home() {
   const [strategyFrequency,setStrategyFrequency]=useState<StrategyRebalanceFrequency>("Monthly");
   const [strategyTargetVolatility,setStrategyTargetVolatility]=useState(.15);
   const [strategyTargetBeta,setStrategyTargetBeta]=useState(.90);
-  const [strategyMaxPosition,setStrategyMaxPosition]=useState(.20);
+  const [strategyMaxPosition,setStrategyMaxPosition]=useState(.05);
   const [executionCostBps,setExecutionCostBps]=useState(5);
   const [shortBorrowRate,setShortBorrowRate]=useState(1);
   const editorRef=useRef<HTMLDivElement|null>(null);

@@ -1,4 +1,5 @@
 import { solveConstrainedRiskAllocation } from "./risk-allocation.ts";
+import { summarizeCovariance, type CovarianceSnapshot, type CovarianceReference } from "./covariance-comparison.ts";
 
 export type PricePoint = { date: string; close: number };
 export type SymbolSeries = { requested: string; symbol: string; currency: string; exchange: string; instrumentType: string; points: PricePoint[] };
@@ -113,20 +114,13 @@ export type StrategyBacktestAnalytics = {
     targetInterpretation: "Ceilings";
   };
 };
-export type CovarianceForecastAnalytics = {
+export type CovarianceForecastAnalytics = CovarianceSnapshot & {
   asOf: string;
   horizon: "Next trading session";
   observations: number;
   tickers: string[];
-  covarianceMatrix: number[][];
-  correlationMatrix: number[][];
-  volatilities: number[];
   expertWeights: StrategyExpertWeight[];
-  portfolioVolatility: number;
-  averageCorrelation: number;
-  strongestPair: { tickerA: string; tickerB: string; correlation: number } | null;
-  diversificationRatio: number;
-  securities: { ticker: string; portfolioWeight: number; volatility: number; riskShare: number }[];
+  references: CovarianceReference[];
 };
 export type RiskTargetSnapshot = {
   asOf: string;
@@ -581,41 +575,27 @@ export function buildCovarianceForecast(payload: MarketPayload, holdings: Analyt
   const assetReturns = prices.map(returns);
   const observations = Math.min(...assetReturns.map((series) => series.length));
   if (observations <= cmIewmaWarmup) return null;
-  const forecast = forecastCombinedIewmaCovariance(assetReturns, observations - 1);
-  const covarianceMatrix = forecast.covarianceMatrix.map((row) => row.map((value) => value * 252));
-  const volatilities = covarianceMatrix.map((row, index) => Math.sqrt(Math.max(row[index], 0)));
-  const correlationMatrix = covarianceMatrix.map((row, first) => row.map((value, second) => value / Math.max(volatilities[first] * volatilities[second], 1e-12)));
+  const predict = createCombinedIewmaPredictor(assetReturns);
+  const forecast = predict(observations - 1);
+  const covarianceMatrix = forecast.covarianceMatrix;
   const portfolioWeights = active.map((holding) => holding.value / total);
-  const covarianceWeights = covarianceMatrix.map((row) => row.reduce((sum, value, column) => sum + value * portfolioWeights[column], 0));
-  const portfolioVariance = Math.max(portfolioWeights.reduce((sum, weight, index) => sum + weight * covarianceWeights[index], 0), 0);
-  const portfolioVolatility = Math.sqrt(portfolioVariance);
-  const pairs: { tickerA: string; tickerB: string; correlation: number }[] = [];
-  for (let first = 0; first < active.length; first++) for (let second = first + 1; second < active.length; second++) {
-    pairs.push({ tickerA: active[first].ticker, tickerB: active[second].ticker, correlation: correlationMatrix[first][second] });
+  const tickers = active.map(holding => holding.ticker);
+  const references: CovarianceReference[] = [63, 126, 252].map(window => {
+    const recent = assetReturns.map(series => series.slice(-window));
+    const matrix = recent.map(first => recent.map(second => 252 * covariance(first, second)));
+    return { id: `historical-${window}`, label: `${window}-session historical estimate`, asOf: dates.at(-1)!, startDate: dates[dates.length - window], observations: window, ...summarizeCovariance(matrix, tickers, portfolioWeights) };
+  });
+  if (observations > cmIewmaWarmup + 1) {
+    references.push({ id: "previous", label: "Previous-session forecast", asOf: dates.at(-2)!, startDate: null, observations: observations - 1, ...summarizeCovariance(predict(observations - 2).covarianceMatrix, tickers, portfolioWeights) });
   }
-  const averageCorrelation = mean(pairs.map((pair) => pair.correlation));
-  const strongestPair = pairs.sort((first, second) => Math.abs(second.correlation) - Math.abs(first.correlation))[0] ?? null;
-  const weightedStandaloneRisk = portfolioWeights.reduce((sum, weight, index) => sum + Math.abs(weight) * volatilities[index], 0);
-  const securities = active.map((holding, index) => ({
-    ticker: holding.ticker,
-    portfolioWeight: portfolioWeights[index],
-    volatility: volatilities[index],
-    riskShare: portfolioVariance > 1e-12 ? portfolioWeights[index] * covarianceWeights[index] / portfolioVariance : 0,
-  })).sort((first, second) => second.volatility - first.volatility);
   return {
     asOf: dates.at(-1)!,
     horizon: "Next trading session",
     observations,
-    tickers: active.map((holding) => holding.ticker),
-    covarianceMatrix,
-    correlationMatrix,
-    volatilities,
+    tickers,
+    ...summarizeCovariance(covarianceMatrix, tickers, portfolioWeights),
     expertWeights: forecast.weights,
-    portfolioVolatility,
-    averageCorrelation,
-    strongestPair,
-    diversificationRatio: portfolioVolatility > 1e-12 ? weightedStandaloneRisk / portfolioVolatility : 0,
-    securities,
+    references,
   };
 }
 

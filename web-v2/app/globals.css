@@ -109,3 +109,66 @@
 
 @media(max-width:1100px){.covariance-layout{grid-template-columns:1fr}.covariance-metrics,.covariance-matrix-panel,.covariance-method{grid-column:auto}.covariance-metrics{grid-template-columns:repeat(3,1fr)}.strategy-control-effects{grid-template-columns:1fr 1fr}.strategy-control-effects>div:nth-child(2){border-right:0}.strategy-recompute-state{grid-column:auto}.strategy-recompute-state span{margin-left:0}}
 @media(max-width:760px){.covariance-metrics{grid-template-columns:1fr 1fr}.covariance-toolbar{align-items:flex-start;flex-direction:column}.covariance-security-head,.covariance-security-row{grid-template-columns:58px 1fr 58px 62px}.covariance-security-head span:nth-child(3),.covariance-security-row>div{display:none}.covariance-method ol{grid-template-columns:1fr}.covariance-method li{border-right:0;border-bottom:1px solid var(--line)}.covariance-date-control{min-width:0}.strategy-control-effects{grid-template-columns:1fr}.strategy-control-effects>div{border-right:0;border-bottom:1px solid var(--line)}.live-allocation-summary{grid-template-columns:1fr 1fr}.live-allocation-summary>div{border-right:0;border-bottom:1px solid var(--line)}.live-allocation-head,.live-allocation-row{grid-template-columns:48px 1fr 42px 54px}.live-allocation-head span:nth-child(3),.live-allocation-head span:nth-child(6),.live-allocation-row>span:first-of-type,.live-allocation-row span.risk-share{display:none}.strategy-recompute-state{align-items:flex-start;flex-direction:column}}
+.covariance-comparison{gap:20px}
+.covariance-comparison .panel{min-width:0}
+.covariance-comparison header{padding:18px 20px;border-bottom:1px solid var(--line);display:flex;gap:12px;justify-content:space-between;flex-wrap:wrap;align-items:center}
+.covariance-comparison h2{font-size:1rem;margin:0;font-weight:550;letter-spacing:-.02em}
+.covariance-comparison header>span{font-size:.8rem;color:#a0afb9}
+.covariance-comparison-summary,.covariance-volatility-comparison{grid-column:1/-1}
+.covariance-comparison-heading{padding:20px;display:flex;gap:20px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.covariance-comparison-heading p{margin:8px 0 0;font-size:.875rem;color:#a0afb9}
+.covariance-comparison-heading label{display:grid;gap:8px;font-size:.75rem;color:#acbcc7;letter-spacing:.07em}
+.covariance-comparison-heading select{padding:10px 12px;color:#e2eaee;background:#111e25;border:1px solid #3c505c;border-radius:6px;font-size:.875rem;max-width:100%;min-height:44px}
+.covariance-risk-comparison{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid var(--line)}
+.covariance-risk-comparison>div{padding:22px 20px;display:grid;gap:12px;border-right:1px solid var(--line);align-content:start}
+.covariance-risk-comparison>div:last-child{border:0;background:linear-gradient(125deg,#153133,transparent)}
+.covariance-risk-comparison span{font-size:.75rem;color:#a0b2bd;letter-spacing:.05em}
+.covariance-risk-comparison strong{font-size:2rem;font-weight:550;font-variant-numeric:tabular-nums}
+.covariance-risk-comparison>div:nth-child(2) strong{color:var(--cyan)}
+.covariance-risk-comparison small{font-size:.8rem;line-height:1.5;color:#a0afb9}
+.covariance-comparison .covariance-comparison-note{padding:16px 20px;border-top:1px solid var(--line);margin:0;color:#a5b5bf;font-size:.875rem;line-height:1.6}
+.covariance-driver-list{padding:22px 20px;display:grid;gap:24px}
+.covariance-driver-list>div{display:grid;grid-template-columns:minmax(130px,1.2fr) minmax(80px,1fr) 80px;align-items:center;gap:14px;font-size:.875rem}
+.covariance-driver-list strong{font-variant-numeric:tabular-nums;text-align:right;font-size:.875rem}
+.covariance-driver-track{height:16px;background:#152027;position:relative}
+.covariance-driver-track:after{content:"";position:absolute;height:24px;top:-4px;left:50%;width:1px;background:#aab8c0}
+.covariance-driver-track i{display:block;position:absolute;height:16px}
+.covariance-pair-changes>div{padding:6px 20px}
+.covariance-pair-changes button{display:grid;grid-template-columns:1fr 110px 54px;width:100%;gap:12px;text-align:left;align-items:center;background:transparent;color:#dce6eb;border:0;border-bottom:1px solid var(--line);padding:12px 0;font-size:.875rem;cursor:pointer}
+.covariance-pair-changes button:last-child{border-bottom:0}
+.covariance-pair-changes button:hover{background:#192a32}
+.covariance-pair-changes button span,.covariance-pair-changes button strong{font-variant-numeric:tabular-nums;text-align:right}
+.covariance-pair-changes button span{color:#a8b9c3}
+.covariance-comparison .covariance-toolbar{padding:16px 20px;flex-wrap:wrap}
+.covariance-comparison .segmented button{font-size:.875rem;padding:10px 14px;min-height:44px}
+.covariance-comparison button:focus-visible,.covariance-comparison select:focus-visible{outline:2px solid #25d2c6;outline-offset:2px}
+.covariance-matrix-detail{display:flex;flex-wrap:wrap;align-items:center;gap:12px 24px;padding:18px 20px;background:#122029;font-size:.875rem}
+.covariance-matrix-detail>span{color:#a8b9c3}
+.covariance-matrix-detail strong{color:#edf4f7;margin-left:8px;font-variant-numeric:tabular-nums}
+.covariance-matrix-detail small{font-size:.8rem;color:#a8b9c3}
+.covariance-scale{display:flex;align-items:center;gap:12px;padding:14px 20px;max-width:650px;color:#b8c8d1;font-size:.8rem}
+.covariance-scale i{height:8px;flex:1;background:linear-gradient(90deg,#829dff,#152027)}
+.covariance-scale i:nth-of-type(2){background:linear-gradient(90deg,#152027,#f3b456)}
+.covariance-comparison .covariance-matrix-scroll{max-height:510px;padding:0 16px 16px}
+.covariance-comparison .covariance-matrix-scroll table{font-size:.875rem}
+.covariance-comparison .covariance-matrix-scroll th{font-size:.8rem;color:#b8c8d1;height:44px}
+.covariance-comparison .covariance-matrix-scroll td{padding:0;min-width:68px;height:44px}
+.covariance-comparison .covariance-matrix-scroll td button{display:block;width:100%;height:44px;border:1px solid transparent;font:inherit;color:#f0f5f7;cursor:pointer;border-radius:3px;padding:4px 8px;text-align:right}
+.covariance-comparison .covariance-matrix-scroll td button[aria-pressed=true]{border:2px solid #edf4f7}
+.covariance-table-scroll{overflow-x:auto}
+.covariance-volatility-comparison table{width:100%;border-collapse:collapse;min-width:800px;font-size:.875rem;font-variant-numeric:tabular-nums}
+.covariance-volatility-comparison th,.covariance-volatility-comparison td{padding:12px 18px;border-bottom:1px solid var(--line);text-align:right}
+.covariance-volatility-comparison thead th{font-size:.75rem;color:#a8b9c3;font-weight:500}
+.covariance-volatility-comparison th:first-child{text-align:left}
+.covariance-bar-legend{display:flex;gap:24px;padding:16px 20px;font-size:.875rem;color:#b8c8d1}
+.covariance-bar-legend span{display:flex;align-items:center;gap:8px}
+.covariance-bar-legend i,.covariance-bar-legend b{width:20px;height:6px;display:block;background:#7a8c9c}
+.covariance-bar-legend b{background:var(--cyan)}
+.covariance-paired-bars{min-width:120px;display:grid;gap:4px}
+.covariance-paired-bars i,.covariance-paired-bars b{display:block;height:6px;background:#7a8c9c;border-radius:2px}
+.covariance-paired-bars b{background:var(--cyan)}
+.covariance-comparison .covariance-expert-list>div,.covariance-comparison .covariance-expert-list strong{font-size:.875rem}
+.covariance-comparison .covariance-experts>p,.covariance-reading p{font-size:.875rem;padding:14px 20px;margin:0;line-height:1.6;color:#a5b5bf}
+.covariance-reading a{color:var(--cyan)}
+@media(max-width:1100px){.covariance-comparison-summary,.covariance-volatility-comparison{grid-column:auto}}
+@media(max-width:760px){.covariance-comparison .covariance-risk-comparison{grid-template-columns:1fr}.covariance-risk-comparison>div{border-right:0;border-bottom:1px solid var(--line);padding:16px 20px}.covariance-driver-list>div{grid-template-columns:1fr 90px}.covariance-driver-track{grid-row:2;grid-column:1/-1}.covariance-comparison .covariance-toolbar{align-items:stretch}.covariance-comparison .segmented{display:flex;flex-wrap:wrap}.covariance-pair-changes button{grid-template-columns:minmax(90px,1fr) 100px 48px;gap:8px}.covariance-scale{gap:8px}.covariance-comparison-heading label{width:100%}}

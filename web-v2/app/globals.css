@@ -176,3 +176,48 @@
 .published-fund-context>div{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.published-fund-context strong{color:#e0ecef}.published-fund-context>div>span{font-size:.75rem;letter-spacing:.1em;color:var(--cyan)}.published-fund-context a,.published-fund-holdings a{color:var(--cyan);font-size:.875rem}.published-fund-context>div>a{margin-left:auto}.published-fund-context p{margin:9px 0 0}.published-fund-context details{margin-top:9px;font-size:.875rem}.published-fund-context summary{cursor:pointer;color:#b9cbd1}.published-fund-context summary:focus-visible{outline:2px solid var(--cyan);outline-offset:4px}
 .published-fund-holdings header{padding:18px 20px;border-bottom:1px solid var(--line)}.published-fund-holdings h3{margin:0 0 6px;font-size:1rem}.published-fund-holdings header>span{font-size:.8rem;color:var(--muted)}.published-fund-holdings dl{margin:0;padding:10px 20px;display:grid;grid-template-columns:1fr 1fr;gap:14px}.published-fund-holdings dl>div{padding:8px 0}.published-fund-holdings dt{font-size:.875rem;color:#8fa5af}.published-fund-holdings dd{font:1.3rem var(--font-geist-mono);margin:8px 0 0}.published-fund-holdings p{margin:0;padding:12px 20px;font-size:.875rem;line-height:1.55;color:#96aab4}.published-fund-holdings>a{display:inline-block;margin:0 20px 20px}.portfolio-name strong{overflow-wrap:anywhere}
 @media(max-width:760px){.published-fund-context>div{align-items:flex-start;flex-direction:column}.published-fund-context>div>a{margin-left:0}}
+
+.sidebar nav.primary-navigation>button:disabled{opacity:.42;cursor:not-allowed;border-color:transparent}
+.published-dow{min-width:0}
+.archive-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border:1px solid var(--line);border-radius:8px;margin:20px 0;background:#0c1419}
+.archive-metrics article{padding:22px;border-right:1px solid var(--line);display:grid;gap:12px}
+.archive-metrics article:last-child{border:0}
+.archive-metrics article>span{font-size:.75rem;letter-spacing:.08em;color:#9eafb9}
+.archive-metrics strong{font-size:2rem;font-weight:550;font-variant-numeric:tabular-nums}
+.archive-metrics article:first-child strong{color:var(--cyan)}
+.archive-metrics article:last-child strong{color:#ef8b96}
+.archive-metrics small{font-size:.8rem;color:#9eafb9}
+.archive-date-panel{padding:22px;margin-bottom:22px;background:linear-gradient(125deg,#10272b,#0c1419)}
+.archive-date-heading{display:flex;align-items:center;justify-content:space-between;gap:20px}
+.archive-date-heading h2{margin:0 0 8px;font-size:1.25rem;font-weight:550}
+.archive-date-heading p{margin:0;font-size:.875rem;color:#a3b5bf;line-height:1.5}
+.archive-date-heading label{display:grid;gap:8px;color:#adbdc6;font-size:.75rem;white-space:nowrap}
+.archive-date-heading select{min-height:44px;padding:10px 12px;background:#0c161c;border:1px solid #44606d;border-radius:5px;color:#ebf2f5;font-size:.875rem}
+.archive-date-slider{width:100%;accent-color:var(--cyan);height:30px;margin:22px 0 0;cursor:pointer}
+.archive-date-range{display:flex;justify-content:space-between;font-size:.8rem;color:#9dafb9;gap:10px;font-variant-numeric:tabular-nums}
+.archive-date-range strong{color:#ecf7f7}
+.archive-date-summary{display:flex;gap:18px 36px;flex-wrap:wrap;margin-top:22px;padding-top:18px;border-top:1px solid #294047;color:#a3b5bf;font-size:.875rem}
+.archive-date-summary b{color:#e8f1f4;margin-left:8px;font-weight:500;font-variant-numeric:tabular-nums}
+.archive-charts{margin-bottom:22px;overflow:hidden}
+.archive-charts .panel-title,.archive-holdings .panel-title{height:auto;min-height:65px;gap:10px;flex-wrap:wrap;padding:18px 22px}
+.archive-charts .panel-title h3,.archive-holdings .panel-title h3{font-size:1rem;font-weight:500}
+.archive-charts .panel-title>span,.archive-holdings .panel-title>span{font-size:.8rem;color:#a0b2bc}
+.archive-charts svg{width:100%;height:auto;display:block;padding:16px 12px 10px}
+.archive-charts svg text{fill:#aabec8;font-size:12px;font-variant-numeric:tabular-nums}
+.archive-gridline{stroke:#263942;stroke-width:1}
+.archive-marker{stroke:#e8f1f4;stroke-width:1;stroke-dasharray:4 4;opacity:.8}
+.archive-legend{display:flex;gap:10px 22px;flex-wrap:wrap;padding:18px 22px 0;color:#adbdc6;font-size:.8rem}
+.archive-legend span{display:flex;gap:7px;align-items:center}
+.archive-legend i{width:11px;height:11px;border-radius:2px}
+.archive-table-note{padding:14px 22px;margin:0;font-size:.875rem;line-height:1.55;color:#a4b5bf}
+.archive-table-scroll{overflow-x:auto}
+.archive-holdings table{width:100%;min-width:610px;border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:.875rem}
+.archive-holdings th,.archive-holdings td{padding:13px 22px;border-top:1px solid var(--line);text-align:right}
+.archive-holdings th:first-child{text-align:left}
+.archive-holdings thead th{color:#99aeb9;font-size:.75rem;font-weight:500;white-space:nowrap}
+.archive-holdings tbody th{font-weight:550;color:#e3edef}
+.archive-weight-cell{position:relative;display:block;min-width:105px;padding:6px 0}
+.archive-weight-cell i{display:block;position:absolute;right:0;top:0;height:100%;background:#1a4648;border-right:2px solid var(--cyan)}
+.archive-weight-cell b{position:relative;font-weight:500}
+.published-dow select:focus-visible,.archive-date-slider:focus-visible{outline:2px solid var(--cyan);outline-offset:4px}
+@media(max-width:760px){.archive-metrics{grid-template-columns:1fr}.archive-metrics article{border-right:0;border-bottom:1px solid var(--line)}.archive-date-heading{align-items:flex-start;flex-direction:column}.archive-date-summary{flex-direction:column;gap:12px}.archive-charts svg{min-height:170px;padding:8px 0}.archive-date-range{font-size:.7rem}}

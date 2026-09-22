@@ -3,12 +3,13 @@
 import { ChangeEvent, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import CovarianceForecastView from "./covariance-forecast";
 import { PublishedFundContext, PublishedFundHoldings } from "./published-fund";
+import PublishedDowPortfolio from "./published-dow";
 import { publishedMarketNeutralFund } from "@/lib/published-fund";
 import { averagePairwiseCorrelation, buildAnalytics, buildCovarianceForecast, buildFactorModel, buildPortfolioDecomposition, buildRiskTargetSnapshot, buildRiskTargetStrategy, buildSecurityDrilldown, historicalReplay, pairwiseCorrelationAnalysis, rollingAveragePairwiseCorrelation, rollingPairwiseCorrelation, type CovarianceForecastAnalytics, type FactorAnalytics, type FactorModelAnalytics, type MarketPayload, type PairwiseCorrelationDetail, type PortfolioAnalytics, type RiskTargetSnapshot, type RollingCorrelationPoint, type SecurityDrilldownAnalytics, type StrategyBacktestAnalytics, type StrategyRebalanceFrequency } from "@/lib/analytics";
 
 type Holding = { ticker: string; name: string; sector: string; value: number; beta: number; vol: number; risk: number };
 type View = "Overview" | "Compare" | "Strategy Analysis" | "Risk Analysis" | "Security Analysis" | "Performance" | "Scenario Lab" | "Methodology" | "Project Brief";
-type DemoKey = "equity" | "published-market-neutral";
+type DemoKey = "equity" | "published-market-neutral" | "published-dow";
 
 const equitySeed: Holding[] = [
   { ticker: "AAPL", name: "Apple", sector: "Technology", value: 40000, beta: 1.14, vol: 24.8, risk: 4.0 },
@@ -39,6 +40,7 @@ const equitySeed: Holding[] = [
 ];
 
 const publishedMarketNeutralSeed: Holding[] = [{ ticker: publishedMarketNeutralFund.ticker, name: publishedMarketNeutralFund.name, sector: "Global market-neutral fund", value: 1000000, beta: 0, vol: 0, risk: 100 }];
+const publishedDowSeed: Holding[] = [{ ticker: "CASH", name: "Starting paper value", sector: "Cash", value: 1000000, beta: 0, vol: 0, risk: 0 }];
 
 const stockCatalog = [
   ["AAPL","Apple","Technology"],["MSFT","Microsoft","Technology"],["NVDA","NVIDIA","Technology"],["AMZN","Amazon","Consumer"],["GOOGL","Alphabet","Technology"],["META","Meta Platforms","Technology"],["TSLA","Tesla","Consumer"],["AVGO","Broadcom","Technology"],["AMD","Advanced Micro Devices","Technology"],["CRM","Salesforce","Technology"],["ORCL","Oracle","Technology"],["NFLX","Netflix","Communication Services"],["JPM","JPMorgan Chase","Financials"],["BAC","Bank of America","Financials"],["GS","Goldman Sachs","Financials"],["BRK.B","Berkshire Hathaway","Financials"],["XOM","Exxon Mobil","Energy"],["CVX","Chevron","Energy"],["COP","ConocoPhillips","Energy"],["UNH","UnitedHealth","Healthcare"],["LLY","Eli Lilly","Healthcare"],["JNJ","Johnson & Johnson","Healthcare"],["ABBV","AbbVie","Healthcare"],["PFE","Pfizer","Healthcare"],["CAT","Caterpillar","Industrials"],["HON","Honeywell","Industrials"],["GE","GE Aerospace","Industrials"],["BA","Boeing","Industrials"],["COST","Costco","Consumer Staples"],["WMT","Walmart","Consumer Staples"],["HD","Home Depot","Consumer"],["KO","Coca-Cola","Consumer Staples"],["PEP","PepsiCo","Consumer Staples"],["PG","Procter & Gamble","Consumer Staples"],["NEE","NextEra Energy","Utilities"],["DUK","Duke Energy","Utilities"],["SO","Southern Company","Utilities"],["DIS","Walt Disney","Communication Services"],["MCD","McDonald’s","Consumer"],
@@ -373,6 +375,7 @@ export default function Home() {
   const [executionCostBps,setExecutionCostBps]=useState(5);
   const [shortBorrowRate,setShortBorrowRate]=useState(1);
   const editorRef=useRef<HTMLDivElement|null>(null);
+  const marketRequest=useRef(0);
 
   const total = holdings.reduce((s, h) => s + h.value, 0);
   const baselineTotal = baselineHoldings.reduce((s, h) => s + h.value, 0);
@@ -382,6 +385,7 @@ export default function Home() {
   const grossExposure=longExposure+shortExposure;
   const hasShort=shortExposure>.5;
   const isPublishedFund=portfolioSource==="demo"&&demoKey==="published-market-neutral";
+  const isArchivedPortfolio=portfolioSource==="demo"&&demoKey==="published-dow";
   const analysisWindow = useMemo(() => ({ startDate: analysisStart || undefined, endDate: analysisEnd || undefined }), [analysisStart, analysisEnd]);
   const analytics = useMemo(() => marketData ? buildAnalytics(marketData, holdings, analysisWindow) : null, [marketData, holdings, analysisWindow]);
   const baselineAnalytics = useMemo(() => marketData ? buildAnalytics(marketData, baselineHoldings, analysisWindow) : null, [marketData, baselineHoldings, analysisWindow]);
@@ -408,10 +412,13 @@ export default function Home() {
 
   const tickerKey = [...new Set([...holdings, ...baselineHoldings].map((holding) => holding.ticker))].join("|");
   const loadMarketData = useCallback(async () => {
+    const request=++marketRequest.current;
+    if(isArchivedPortfolio){setMarketData(null);setDataError(null);setLoading(false);return;}
     setLoading(true); setDataError(null);
     try {
       const response = await fetch("/api/market-data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tickers: tickerKey.split("|").filter(Boolean), years: 10 }) });
       const payload = await response.json() as MarketPayload;
+      if(request!==marketRequest.current)return;
       if (!response.ok || payload.error) throw new Error(payload.error || "Market data request failed.");
       const availableEnd = payload.asOf || payload.series.SPY?.points.at(-1)?.date || "";
       const availableStart = payload.factorStartDate || payload.series.SPY?.points[0]?.date || "";
@@ -422,9 +429,10 @@ export default function Home() {
       setAnalysisStart((current) => current && current >= availableStart ? current : (defaultStart < availableStart ? availableStart : defaultStart));
       setMarketData(payload);
     } catch (error) {
+      if(request!==marketRequest.current)return;
       setDataError(error instanceof Error ? error.message : "Unable to load Yahoo Finance data.");
-    } finally { setLoading(false); }
-  }, [tickerKey]);
+    } finally { if(request===marketRequest.current)setLoading(false); }
+  }, [tickerKey,isArchivedPortfolio]);
 
   // Synchronize the current ticker set with the external market-data service.
   // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -462,7 +470,7 @@ export default function Home() {
   function remove(ticker: string) { if(ticker==="CASH")return;setHoldings(items=>{const removed=items.find(item=>item.ticker===ticker)?.value??0;const remaining=items.filter(item=>item.ticker!==ticker);return remaining.some(item=>item.ticker==="CASH")?remaining.map(item=>item.ticker==="CASH"?{...item,value:item.value+removed}:item):[...remaining,{ticker:"CASH",name:"Cash (residual)",sector:"Cash",value:removed,beta:0,vol:0,risk:0}]}); }
   function addSecurity(rawTicker:string) {const ticker=rawTicker.trim().toUpperCase();if(!/^[A-Z][A-Z0-9.-]{0,9}$/.test(ticker)){setPortfolioError("Enter a valid US ticker symbol.");return}if(holdings.some(item=>item.ticker===ticker)){setPortfolioError(`${ticker} is already in the portfolio.`);return}const match=stockCatalog.find(item=>item[0]===ticker);const added:Holding={ticker,name:match?.[1]??ticker,sector:match?.[2]??"Unclassified",value:0,beta:1,vol:25,risk:2};setHoldings(items=>[...items.filter(item=>item.ticker!=="CASH"),added,...items.filter(item=>item.ticker==="CASH")]);setAddingSecurity(false);setSecuritySearch("");setPortfolioError(null)}
   function saveBaseline(){setBaselineHoldings(holdings.map(item=>({...item})));}
-  function loadDemo(key:DemoKey){const next=key==="published-market-neutral"?publishedMarketNeutralSeed:equitySeed;setDemoKey(key);setHoldings(next.map(item=>({...item})));setBaselineHoldings(next.map(item=>({...item})));setPortfolioSource("demo");setPortfolioName(key==="published-market-neutral"?"AQR Equity Market Neutral":"US Equity Portfolio");setPortfolioError(null);setSelectedTicker(null);setEditing(false)}
+  function loadDemo(key:DemoKey){const next=key==="published-market-neutral"?publishedMarketNeutralSeed:key==="published-dow"?publishedDowSeed:equitySeed;setDemoKey(key);setHoldings(next.map(item=>({...item})));setBaselineHoldings(next.map(item=>({...item})));setPortfolioSource("demo");setPortfolioName(key==="published-market-neutral"?"AQR Equity Market Neutral":key==="published-dow"?"Published Dow Strategy":"US Equity Portfolio");setPortfolioError(null);setSelectedTicker(null);setEditing(false);setView("Overview")}
   function resetDemo(){loadDemo(demoKey)}
   function upload(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]; if (!file) return;
@@ -497,33 +505,33 @@ export default function Home() {
     <main className="app-shell">
       <header className="topbar">
         <div className="brand"><span className="brandmark">F</span><span>FactorScope</span><em>PORTFOLIO INTELLIGENCE</em></div>
-        <div className="top-meta"><span className={`live-dot ${dataError ? "error-dot" : missingHoldings.length ? "warning-dot" : ""}`} /> {loading ? "Loading Yahoo data" : dataError ? "Data connection issue" : missingHoldings.length ? `${missingHoldings.length} ticker${missingHoldings.length>1?"s":""} unavailable` : `Yahoo Finance · through ${marketData?.asOf ?? "latest"}`} <b>•</b> Daily adjusted <div className="avatar">FS</div></div>
+        <div className="top-meta">{isArchivedPortfolio?<>Published archive · through 2026-04-27 <b>•</b> Paper simulation</>:<><span className={`live-dot ${dataError ? "error-dot" : missingHoldings.length ? "warning-dot" : ""}`} /> {loading ? "Loading Yahoo data" : dataError ? "Data connection issue" : missingHoldings.length ? `${missingHoldings.length} ticker${missingHoldings.length>1?"s":""} unavailable` : `Yahoo Finance · through ${marketData?.asOf ?? "latest"}`} <b>•</b> Daily adjusted</>} <div className="avatar">FS</div></div>
       </header>
 
       <aside className="sidebar">
         <section className="portfolio-card">
           <div className="eyebrow">CURRENT PORTFOLIO</div>
-          <label className="portfolio-switcher"><span>DEMO</span><select value={portfolioSource==="demo"?demoKey:"uploaded"} onChange={event=>event.target.value!=="uploaded"&&loadDemo(event.target.value as DemoKey)}><option value="equity">US Equity Portfolio</option><option value="published-market-neutral">AQR Market Neutral (QMNIX)</option>{portfolioSource==="uploaded"&&<option value="uploaded">Uploaded portfolio</option>}</select></label>
+          <label className="portfolio-switcher"><span>DEMO</span><select value={portfolioSource==="demo"?demoKey:"uploaded"} onChange={event=>event.target.value!=="uploaded"&&loadDemo(event.target.value as DemoKey)}><option value="equity">US Equity Portfolio</option><option value="published-market-neutral">AQR Market Neutral (QMNIX)</option><option value="published-dow">Published Dow Strategy</option>{portfolioSource==="uploaded"&&<option value="uploaded">Uploaded portfolio</option>}</select></label>
           <div className="portfolio-name"><strong>{portfolioName}</strong></div>
-          <div className="demo-badge">{isPublishedFund?"PUBLISHED FUND":portfolioSource==="demo"?"DEMO PORTFOLIO":"UPLOADED PORTFOLIO"}</div>
-          <div className="portfolio-total">{money(total)}</div><div className="muted">{isPublishedFund?"1 fund share class":`${holdings.filter(h => h.ticker !== "CASH").length} positions`} · USD{hasShort?` · ${(grossExposure/Math.max(total,1)*100).toFixed(0)}% gross`:""}</div>
-          {!isPublishedFund&&<button className="edit-btn" onClick={() => setEditing(current=>!current)}>{editing ? "Close editor" : "Edit portfolio"}</button>}
+          <div className="demo-badge">{isArchivedPortfolio?"PUBLISHED ARCHIVE":isPublishedFund?"PUBLISHED FUND":portfolioSource==="demo"?"DEMO PORTFOLIO":"UPLOADED PORTFOLIO"}</div>
+          <div className="portfolio-total">{money(total)}</div><div className="muted">{isArchivedPortfolio?"Starting paper value":isPublishedFund?"1 fund share class":`${holdings.filter(h => h.ticker !== "CASH").length} positions`} · USD{hasShort?` · ${(grossExposure/Math.max(total,1)*100).toFixed(0)}% gross`:""}</div>
+          {!isPublishedFund&&!isArchivedPortfolio&&<button className="edit-btn" onClick={() => setEditing(current=>!current)}>{editing ? "Close editor" : "Edit portfolio"}</button>}
         </section>
         <nav className="primary-navigation" aria-label="Primary navigation">
-          <button onClick={()=>setView("Overview")} className={primarySection==="Portfolio"?"active":""}><Icon name="grid"/><span><b>Portfolio</b><small>Overview, performance &amp; events</small></span></button>
-          <button onClick={()=>{setView("Risk Analysis");setRiskTab("Factors")}} className={primarySection==="Risk & Attribution"?"active":""}><Icon name="factor"/><span><b>Risk &amp; Attribution</b><small>Factors, covariance &amp; positions</small></span></button>
-          <button onClick={()=>setView("Compare")} className={primarySection==="Strategy Lab"?"active":""}><Icon name="strategy"/><span><b>Strategy Lab</b><small>Compare, construct &amp; stress</small></span></button>
+          <button onClick={()=>setView("Overview")} className={primarySection==="Portfolio"?"active":""}><Icon name="grid"/><span><b>Portfolio</b><small>{isArchivedPortfolio?"Recorded value & dated holdings":"Overview, performance & events"}</small></span></button>
+          <button disabled={isArchivedPortfolio} title={isArchivedPortfolio?"Choose US Equity Portfolio to use risk tools":undefined} onClick={()=>{setView("Risk Analysis");setRiskTab("Factors")}} className={primarySection==="Risk & Attribution"?"active":""}><Icon name="factor"/><span><b>Risk &amp; Attribution</b><small>Factors, covariance &amp; positions</small></span></button>
+          <button disabled={isArchivedPortfolio} title={isArchivedPortfolio?"Choose US Equity Portfolio to construct allocations":undefined} onClick={()=>setView("Compare")} className={primarySection==="Strategy Lab"?"active":""}><Icon name="strategy"/><span><b>Strategy Lab</b><small>Compare, construct &amp; stress</small></span></button>
           <button onClick={()=>setView("Methodology")} className={primarySection==="About"?"active":""}><Icon name="method"/><span><b>About</b><small>Methodology &amp; project brief</small></span></button>
         </nav>
         <section className="sidebar-actions">
           <label className="upload"><Icon name="upload" /> Upload CSV<input type="file" accept=".csv" onChange={upload} /></label>
           <button onClick={resetDemo}><Icon name="reset" /> Reset demo</button>
         </section>
-        <section className="model-card"><div className="eyebrow">MODEL</div><strong>ETF Proxy Factor Model</strong><span>Custom date range · daily</span><span className={dataError ? "model-error" : "healthy"}>{dataError ? "● Data unavailable" : loading ? "● Refreshing" : "● Live data ready"}</span></section>
-        <p className="sidebar-note">Prototype market data is supplied by Yahoo Finance. Factor and scenario sensitivities are estimates, not forecasts.</p>
+        {isArchivedPortfolio?<><section className="model-card"><div className="eyebrow">SOURCE</div><strong>Cvxportfolio archive</strong><span>Original holdings and targets</span><span>Fixed publication snapshot</span></section><p className="sidebar-note">Choose US Equity Portfolio to use risk forecasts and Strategy Lab. This archive preserves the authors’ allocations.</p></>:<><section className="model-card"><div className="eyebrow">MODEL</div><strong>ETF Proxy Factor Model</strong><span>Custom date range · daily</span><span className={dataError ? "model-error" : "healthy"}>{dataError ? "● Data unavailable" : loading ? "● Refreshing" : "● Live data ready"}</span></section><p className="sidebar-note">Prototype market data is supplied by Yahoo Finance. Factor and scenario sensitivities are estimates, not forecasts.</p></>}
       </aside>
 
       <section className="workspace">
+        {isArchivedPortfolio ? (primarySection==="About"?<><div className="page-head"><div><span className="kicker">FACTORSCOPE / ABOUT</span><h1>{displayedViewCopy[0]}</h1><p>{displayedViewCopy[1]}</p></div></div><div className="section-tabs" role="tablist" aria-label="About FactorScope">{(["Methodology","Project Brief"] as const).map(tab=><button key={tab} role="tab" aria-selected={aboutTab===tab} onClick={()=>setView(tab)}>{tab}</button>)}</div>{view==="Methodology"?<Methodology/>:<ProjectBrief setView={setView}/>}</>:<PublishedDowPortfolio/>) : <>
         {editing && !isPublishedFund && <div className="editor-panel" ref={editorRef}>
           <div className="panel-head"><div><span className="kicker">PORTFOLIO BUILDER</span><h2>Edit positions</h2></div><div className="panel-actions"><button className="secondary-action" onClick={saveBaseline}>Save current as baseline</button><button className="secondary-action" onClick={normalizeInvested}>{hasShort?"Normalize to 200% gross":"Normalize invested to 100%"}</button><button onClick={()=>setAddingSecurity(current=>!current)}><Icon name="plus" /> Add security</button></div></div>
           {addingSecurity&&<div className="security-picker"><label><span>SEARCH BY TICKER OR COMPANY</span><input autoFocus value={securitySearch} onChange={event=>setSecuritySearch(event.target.value)} onKeyDown={event=>{if(event.key==="Enter")addSecurity(securitySearch)}} placeholder="Try META, Broadcom or JPMorgan"/></label><div className="security-picker-results">{stockCatalog.filter(item=>!holdings.some(holding=>holding.ticker===item[0])&&(!securitySearch.trim()||`${item[0]} ${item[1]}`.toLowerCase().includes(securitySearch.trim().toLowerCase()))).slice(0,8).map(item=><button key={item[0]} onClick={()=>addSecurity(item[0])}><strong>{item[0]}</strong><span>{item[1]}</span><em>{item[2]}</em></button>)}{securitySearch.trim()&&!stockCatalog.some(item=>item[0]===securitySearch.trim().toUpperCase())&&<button className="add-custom-security" onClick={()=>addSecurity(securitySearch)}><strong>ADD {securitySearch.trim().toUpperCase()}</strong><span>Use typed Yahoo Finance ticker</span><em>Verify after loading</em></button>}</div></div>}
@@ -557,6 +565,7 @@ export default function Home() {
         {view === "Scenario Lab" && analytics && marketData && <ScenarioLab mode={scenarioMode} setMode={setScenarioMode} market={marketShock} setMarket={setMarketShock} tech={techShock} setTech={setTechShock} impact={scenarioImpact} total={total} holdings={holdings} analytics={analytics} payload={marketData} />}
         {view === "Methodology" && <Methodology />}
         {view === "Project Brief" && <ProjectBrief setView={setView} />}
+        </>}
         <footer className="site-footer"><span>FactorScope</span><p>Independent quantitative finance project · Product design, research methodology and front-end engineering</p><b>PROTOTYPE v2</b></footer>
       </section>
       {view !== "Security Analysis" && selectedHolding && securityAnalytics && analytics && <SecurityDrilldown holding={selectedHolding} security={securityAnalytics} portfolio={analytics} total={total} onClose={() => setSelectedTicker(null)} />}

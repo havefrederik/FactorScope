@@ -34,6 +34,10 @@ async function loadSymbol(requested: string, period1: Date, period2: Date): Prom
     events: "div|split",
   });
 
+  if (result.meta.instrumentType === "MUTUALFUND" && result.quotes.some(quote => Number.isFinite(quote.close) && !Number.isFinite(quote.adjclose))) {
+    throw new Error("Distribution-adjusted fund history is unavailable; unadjusted NAV would misstate total returns.");
+  }
+
   const points = result.quotes
     .map((quote) => ({
       date: quote.date.toISOString().slice(0, 10),

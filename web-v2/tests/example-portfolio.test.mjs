@@ -10,13 +10,18 @@ function fixture(){
 }
 const near=(a,b,tol=1e-7)=>assert.ok(Math.abs(a-b)<tol,`${a} != ${b}`);
 test('same-month ranking picks twenty names, caps starting weights, retains daily holdings and excludes incomplete month',()=>{
- const {payload,universe}=fixture();const result=buildExamplePortfolio(payload,universe,'2025-01-01','2025-03-10',0);
+ const {payload,universe}=fixture();const result=buildExamplePortfolio(payload,universe,'2025-01-01','2025-03-10',0,1);
  assert.equal(result.rebalances.length,2);assert.equal(result.analytics.endDate,'2025-02-28');
  for(const reb of result.rebalances){assert.equal(reb.targets.filter(Boolean).length,20);assert.ok(reb.targets.every(w=>w===0||w===.05));const chosen=reb.scores.filter((s,j)=>reb.targets[j]>0),omitted=reb.scores.filter((s,j)=>!reb.targets[j]);assert.ok(Math.min(...chosen)>=Math.max(...omitted));}
  for(const d of result.days)near(d.values.reduce((a,b)=>a+b,0)+d.cash,d.nav);
  assert.ok(result.days.some(d=>d.values.some(v=>v/d.nav>.05)),'daily weights drift above starting cap');
  const first=result.days[1],reb=result.rebalances[0];let expected=0;
  result.tickers.forEach((ticker,j)=>{expected+=reb.targets[j]*1e6*payload.series[ticker].points[1].close/payload.series[ticker].points[0].close;});near(first.nav,expected);
+});
+test('default allocation is diversified, fully budgeted and capped at 5% per stock',()=>{
+ const {payload,universe}=fixture();const result=buildExamplePortfolio(payload,universe,'2025-01-01','2025-03-10',0);
+ for(const reb of result.rebalances){assert.equal(reb.targets.filter(Boolean).length,22);near(reb.targets.reduce((a,b)=>a+b,0),1);assert.ok(reb.targets.every(w=>w>=0&&w<=.05+1e-12));}
+ for(const d of result.days)near(d.values.reduce((a,b)=>a+b,0)+d.cash,d.nav);
 });
 test('transaction costs reconcile to both sides of trades and lower initial funded holdings',()=>{
  const {payload,universe}=fixture();const r=buildExamplePortfolio(payload,universe,'2025-01-01','2025-03-10',5);

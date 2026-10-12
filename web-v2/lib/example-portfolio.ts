@@ -7,7 +7,7 @@ const variance = (x: number[]) => { const m=mean(x);return x.reduce((s,v)=>s+(v-
 
 // Deliberately retrospective example: a month's realized Sharpe selects that SAME month's holdings.
 // Prices are adjusted closes. Allocation occurs at the preceding session's close.
-export function buildExamplePortfolio(payload: MarketPayload, universe: string[], start: string, end: string, costBps=5) {
+export function buildExamplePortfolio(payload: MarketPayload, universe: string[], start: string, end: string, costBps=5, selectionShare=.2) {
   const benchmark=payload.series.SPY?.points;
   if(!benchmark?.length||!payload.asOf)return null;
   const tickers=[...new Set(universe)].filter(t=>t!=="CASH"&&t!=="SPY").sort();
@@ -28,7 +28,13 @@ export function buildExamplePortfolio(payload: MarketPayload, universe: string[]
       return vol>1e-10?mean(r)/vol*Math.sqrt(252):null;
     });
     const ranked=scores.map((score,i)=>({score,i})).filter((x):x is {score:number;i:number}=>x.score!==null).sort((a,b)=>b.score-a.score||tickers[a.i].localeCompare(tickers[b.i]));
-    const targets=tickers.map(()=>0);ranked.slice(0,20).forEach(x=>targets[x.i]=.05);
+    // A broad allocation moderates the retrospective selection's unusually high Sharpe.
+    // Both sleeves share the same 5% starting-position ceiling and leave missing slots in cash.
+    const selection=Math.max(0,Math.min(1,selectionShare));
+    const funded=Math.min(1,ranked.length*.05);
+    const targets=tickers.map(()=>0);
+    ranked.forEach(x=>targets[x.i]=(1-selection)*funded/ranked.length);
+    ranked.slice(0,20).forEach(x=>targets[x.i]+=selection*.05);
     if(!days.length)days.push({date:benchmark[first-1].date,nav:1_000_000,values:[...values],cash,rebalance:-1});
     const nav=cash+values.reduce((a,b)=>a+b,0);
     let after=nav;

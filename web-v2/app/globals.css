@@ -245,3 +245,29 @@
 .example-portfolio .example-metrics{grid-template-columns:repeat(4,minmax(0,1fr))}
 @media(max-width:1100px){.example-portfolio .example-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:760px){.example-portfolio .page-head h1{font-size:28px}.example-portfolio .example-metrics{grid-template-columns:1fr}}
+
+.example-portfolio .page-head{margin-bottom:8px}
+.example-context{margin:0 0 10px;color:#a3b5bf;font-size:11px;line-height:1.5}
+.example-portfolio .example-controls{gap:12px;margin:10px 0}
+.example-portfolio .example-controls label{gap:4px}
+.example-portfolio .example-controls input,.example-portfolio .example-controls button{min-height:34px;padding:6px 10px}
+.example-portfolio .example-controls>span{padding:6px 0;margin-left:auto;font-size:11px}
+.example-portfolio .archive-metrics{margin:10px 0}
+.example-portfolio .archive-metrics article{padding:12px 14px;gap:5px}
+.example-portfolio .example-chart{margin:12px 0;padding-bottom:8px}
+.example-portfolio .example-chart>.panel-title{height:auto;min-height:42px;padding:10px 14px;gap:8px;flex-wrap:wrap}
+.example-portfolio .overview-decomposition .decomposition-frame{margin-top:10px}
+.example-portfolio .overview-decomposition .decomposition-chart{height:420px}
+.example-portfolio .example-holdings{margin-top:12px;overflow:hidden}
+.example-portfolio .archive-date-panel{padding:12px 14px;margin:0;background:transparent}
+.example-portfolio .archive-date-heading h2{margin-bottom:4px}
+.example-portfolio .archive-date-heading label{gap:4px}
+.example-portfolio .archive-date-heading select{min-height:34px;padding:6px 10px}
+.example-portfolio .archive-date-slider{height:20px;margin:10px 0 0}
+.example-portfolio .archive-date-summary{margin-top:8px;padding-top:8px;gap:8px 20px}
+.example-portfolio .archive-holdings th,.example-portfolio .archive-holdings td{padding:9px 14px}
+.example-stock-link{display:inline-flex;align-items:center;gap:12px;padding:0;border:0;background:transparent;color:var(--cyan);font:inherit;font-weight:600;cursor:pointer;text-align:left}
+.example-stock-link span{font-size:10px;font-weight:400;color:#93a6af}
+.example-stock-link:hover span{color:var(--cyan)}
+.example-stock-link:focus-visible{outline:2px solid var(--cyan);outline-offset:4px;border-radius:2px}
+@media(max-width:760px){.example-portfolio .example-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.example-portfolio .archive-metrics article:nth-child(odd){border-right:1px solid var(--line)}.example-portfolio .overview-decomposition .decomposition-chart{height:360px}.example-portfolio .archive-date-heading{gap:10px}.example-portfolio .archive-date-summary{flex-direction:row}.example-portfolio .example-controls>span{margin-left:0}.example-stock-link{gap:6px}}

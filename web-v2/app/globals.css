@@ -179,6 +179,12 @@
 
 .sidebar nav.primary-navigation>button:disabled{opacity:.42;cursor:not-allowed;border-color:transparent}
 .published-dow{min-width:0}
+.example-controls{display:flex;align-items:end;gap:16px;flex-wrap:wrap;margin:20px 0;color:#aabac3;font-size:.85rem}
+.example-controls label{display:grid;gap:8px}
+.example-controls input,.example-controls button{min-height:42px;padding:9px 12px;color:#e2eeee;background:#11242b;border:1px solid #3a5862;border-radius:5px;font:inherit}
+.example-controls input[type=number]{width:110px}.example-controls button{cursor:pointer;color:var(--cyan)}
+.example-controls>span{padding:12px 0}.example-chart{margin-top:24px;padding-bottom:18px}
+.example-portfolio .archive-metrics article:last-child strong{color:#e2eeee}
 .archive-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border:1px solid var(--line);border-radius:8px;margin:20px 0;background:#0c1419}
 .archive-metrics article{padding:22px;border-right:1px solid var(--line);display:grid;gap:12px}
 .archive-metrics article:last-child{border:0}

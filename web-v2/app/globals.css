@@ -231,3 +231,17 @@
 .archive-weight-cell b{position:relative;font-weight:500}
 .published-dow select:focus-visible,.archive-date-slider:focus-visible{outline:2px solid var(--cyan);outline-offset:4px}
 @media(max-width:760px){.archive-metrics{grid-template-columns:1fr}.archive-metrics article{border-right:0;border-bottom:1px solid var(--line)}.archive-date-heading{align-items:flex-start;flex-direction:column}.archive-date-summary{flex-direction:column;gap:12px}.archive-charts svg{min-height:170px;padding:8px 0}.archive-date-range{font-size:.7rem}}
+
+.example-portfolio .page-head h1{font-size:32px}
+.example-portfolio .page-head p,.example-portfolio .published-fund-context{font-size:12px}
+.example-portfolio .example-controls,.example-portfolio .archive-date-heading p,.example-portfolio .archive-date-heading select,.example-portfolio .archive-date-summary,.example-portfolio .archive-holdings table,.example-portfolio .archive-table-note{font-size:12px}
+.example-portfolio .archive-metrics strong{font-size:25px}
+.example-portfolio .archive-metrics article>span{font-size:10px}
+.example-portfolio .archive-metrics small{font-size:11px}
+.example-portfolio .archive-date-heading h2{font-size:16px}
+.example-portfolio .archive-date-heading label,.example-portfolio .panel-title>span{font-size:11px}
+.example-portfolio .panel-title h3{font-size:13px}
+.example-portfolio .archive-holdings thead th{font-size:10px}
+.example-portfolio .example-metrics{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media(max-width:1100px){.example-portfolio .example-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:760px){.example-portfolio .page-head h1{font-size:28px}.example-portfolio .example-metrics{grid-template-columns:1fr}}

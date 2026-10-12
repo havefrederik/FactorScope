@@ -364,6 +364,7 @@ export default function Home() {
   const [marketData, setMarketData] = useState<MarketPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [dataError, setDataError] = useState<string | null>(null);
+  const [dataErrorKind, setDataErrorKind] = useState<"request" | "connection">("connection");
   const [portfolioError,setPortfolioError]=useState<string|null>(null);
   const [portfolioSource,setPortfolioSource]=useState<"demo"|"uploaded">("demo");
   const [portfolioName,setPortfolioName]=useState("US Equity Portfolio");
@@ -420,12 +421,15 @@ export default function Home() {
   const loadMarketData = useCallback(async () => {
     const request=++marketRequest.current;
     if(isArchivedPortfolio){setMarketData(null);setDataError(null);setLoading(false);return;}
-    setLoading(true); setDataError(null);
+    setLoading(true); setDataError(null); setDataErrorKind("connection");
     try {
-      const response = await fetch("/api/market-data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tickers: tickerKey.split("|").filter(Boolean), years: 10 }) });
+      const response = await fetch("/api/market-data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tickers: tickerKey.split("|").filter(Boolean), years: isExample ? 4 : 10 }) });
       const payload = await response.json() as MarketPayload;
       if(request!==marketRequest.current)return;
-      if (!response.ok || payload.error) throw new Error(payload.error || "Market data request failed.");
+      if (!response.ok || payload.error) {
+        setDataErrorKind(response.status >= 400 && response.status < 500 && response.status !== 429 ? "request" : "connection");
+        throw new Error(payload.error || "Market data request failed.");
+      }
       const availableEnd = payload.asOf || payload.series.SPY?.points.at(-1)?.date || "";
       const availableStart = payload.factorStartDate || payload.series.SPY?.points[0]?.date || "";
       const defaultStartDate = new Date(`${availableEnd}T00:00:00Z`);
@@ -438,7 +442,7 @@ export default function Home() {
       if(request!==marketRequest.current)return;
       setDataError(error instanceof Error ? error.message : "Unable to load Yahoo Finance data.");
     } finally { if(request===marketRequest.current)setLoading(false); }
-  }, [tickerKey,isArchivedPortfolio]);
+  }, [tickerKey,isArchivedPortfolio,isExample]);
 
   // Synchronize the current ticker set with the external market-data service.
   // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -511,7 +515,7 @@ export default function Home() {
     <main className="app-shell">
       <header className="topbar">
         <div className="brand"><span className="brandmark">F</span><span>FactorScope</span><em>PORTFOLIO INTELLIGENCE</em></div>
-        <div className="top-meta">{isArchivedPortfolio?<>Published archive · through 2026-04-27 <b>•</b> Paper simulation</>:<><span className={`live-dot ${dataError ? "error-dot" : missingHoldings.length ? "warning-dot" : ""}`} /> {loading ? "Loading Yahoo data" : dataError ? "Data connection issue" : missingHoldings.length ? `${missingHoldings.length} ticker${missingHoldings.length>1?"s":""} unavailable` : `Yahoo Finance · through ${marketData?.asOf ?? "latest"}`} <b>•</b> Daily adjusted</>} <div className="avatar">FS</div></div>
+        <div className="top-meta">{isArchivedPortfolio?<>Published archive · through 2026-04-27 <b>•</b> Paper simulation</>:<><span className={`live-dot ${dataError ? "error-dot" : missingHoldings.length ? "warning-dot" : ""}`} /> {loading ? "Loading Yahoo data" : dataError ? dataErrorKind === "request" ? "Invalid data request" : "Data connection issue" : missingHoldings.length ? `${missingHoldings.length} ticker${missingHoldings.length>1?"s":""} unavailable` : `Yahoo Finance · through ${marketData?.asOf ?? "latest"}`} <b>•</b> Daily adjusted</>} <div className="avatar">FS</div></div>
       </header>
 
       <aside className="sidebar">
@@ -546,7 +550,7 @@ export default function Home() {
           </div>{hasShort?<><div className="allocation-summary exposure-summary"><span><b>LONG</b>{(longExposure/Math.max(total,1)*100).toFixed(1)}%</span><span><b>SHORT</b>{(shortExposure/Math.max(total,1)*100).toFixed(1)}%</span><span><b>GROSS</b>{(grossExposure/Math.max(total,1)*100).toFixed(1)}%</span><span><b>NET</b>{(invested/Math.max(total,1)*100).toFixed(1)}%</span><span><b>CASH / COLLATERAL</b>{money(total-invested)}</span></div><div className="cost-assumptions"><label><span>EXECUTION COST</span><input type="number" min="0" step="1" value={executionCostBps} onChange={event=>setExecutionCostBps(Math.max(0,Number(event.target.value)||0))}/><b>bps</b></label><label><span>SHORT BORROW</span><input type="number" min="0" step=".1" value={shortBorrowRate} onChange={event=>setShortBorrowRate(Math.max(0,Number(event.target.value)||0))}/><b>% p.a.</b></label></div></>:<div className="allocation-summary"><span><b>INVESTED</b>{(invested/Math.max(total,1)*100).toFixed(1)}%</span><span className={(total-invested)<0?"leveraged":""}><b>{(total-invested)<0?"BORROWED CASH":"CASH RESIDUAL"}</b>{money(total-invested)} · {((total-invested)/Math.max(total,1)*100).toFixed(1)}%</span></div>}<div className={`editor-foot ${portfolioError?"editor-error":""}`}>{portfolioError??(hasShort?"Positive values are long positions; negative values are shorts. Dollar or weight edits change only that security and cash/collateral. Costs are explicit assumptions, not embedded in Yahoo prices.":"Changing a security’s dollars or weight changes only that position and the cash residual. Other security weights remain untouched. Negative cash represents an over-allocated portfolio; normalize only when you choose to.")}</div>
         </div>}
 
-        <div className={`prototype-note ${dataError ? "prototype-error" : missingHoldings.length ? "prototype-warning" : ""}`}><span>{dataError ? "DATA ISSUE" : missingHoldings.length ? "PARTIAL DATA" : "LIVE DEMO"}</span><p>{dataError ? `${dataError} The interface remains available; retry the connection when ready.` : missingHoldings.length ? `No usable Yahoo history for ${missingHoldings.join(", ")}. Analytics exclude those positions and retain their value in portfolio cash.` : `USD portfolio analytics calculated from Yahoo Finance daily adjusted prices${marketData?.asOf ? ` through ${marketData.asOf}` : ""}.`}</p>{dataError && <button onClick={loadMarketData}>Retry</button>}</div>
+        <div className={`prototype-note ${dataError ? "prototype-error" : missingHoldings.length ? "prototype-warning" : ""}`}><span>{dataError ? dataErrorKind === "request" ? "INVALID REQUEST" : "CONNECTION ISSUE" : missingHoldings.length ? "PARTIAL DATA" : "LIVE DEMO"}</span><p>{dataError ? dataErrorKind === "request" ? dataError : `${dataError} The interface remains available; retry the connection when ready.` : missingHoldings.length ? `No usable Yahoo history for ${missingHoldings.join(", ")}. Analytics exclude those positions and retain their value in portfolio cash.` : `USD portfolio analytics calculated from Yahoo Finance daily adjusted prices${marketData?.asOf ? ` through ${marketData.asOf}` : ""}.`}</p>{dataError && <button onClick={loadMarketData}>Retry</button>}</div>
         <div className="page-head">
           <div><span className="kicker">{view === "Overview" ? "LIVE PORTFOLIO INTELLIGENCE" : `FACTORSCOPE / ${primarySection.toUpperCase()}`}</span><h1>{displayedViewCopy[0]}</h1><p>{displayedViewCopy[1]}</p></div>
           {isCovarianceView?<div className="date-control covariance-date-control"><span>FORECAST AS OF</span><label><small>DATE</small><input type="date" aria-label="Covariance forecast date" min={availableStartDate} max={availableEndDate} value={analysisEnd} disabled={!availableEndDate} onChange={(event)=>setAnalysisEnd(event.target.value)} /></label></div>:view !== "Project Brief" && !(view === "Performance" && performanceTab === "Event Analysis") && <div className="date-control"><span>ANALYSIS PERIOD</span><label><small>FROM</small><input type="date" aria-label="Analysis start date" min={availableStartDate} max={analysisEnd || availableEndDate} value={analysisStart} disabled={!availableStartDate} onChange={(event)=>setAnalysisStart(event.target.value)} /></label><i>→</i><label><small>TO</small><input type="date" aria-label="Analysis end date" min={analysisStart || availableStartDate} max={availableEndDate} value={analysisEnd} disabled={!availableEndDate} onChange={(event)=>setAnalysisEnd(event.target.value)} /></label></div>}

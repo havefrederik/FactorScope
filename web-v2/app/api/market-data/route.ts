@@ -1,4 +1,5 @@
 import YahooFinance from "yahoo-finance2";
+import { normalizeYahooSymbol, validateMarketTickers } from "../../../lib/market-data-request.ts";
 
 const yahooFinance = new YahooFinance();
 const cache = new Map<string, { expires: number; value: SymbolSeries }>();
@@ -16,10 +17,6 @@ type SymbolSeries = {
   instrumentType: string;
   points: PricePoint[];
 };
-
-function normalizeYahooSymbol(symbol: string) {
-  return symbol.toUpperCase().trim().replace("BRK.B", "BRK-B").replace("BF.B", "BF-B");
-}
 
 async function loadSymbol(requested: string, period1: Date, period2: Date): Promise<SymbolSeries> {
   const symbol = normalizeYahooSymbol(requested);
@@ -61,18 +58,13 @@ async function loadSymbol(requested: string, period1: Date, period2: Date): Prom
 export async function POST(request: Request) {
   try {
     const body = await request.json() as { tickers?: string[]; years?: number };
-    const raw = Array.isArray(body.tickers) ? body.tickers : [];
-    const holdings = raw
-      .map((ticker) => String(ticker).toUpperCase().trim())
-      .filter((ticker) => ticker && ticker !== "CASH");
-    const invalid = holdings.filter((ticker) => !/^[A-Z0-9.^=-]{1,15}$/.test(normalizeYahooSymbol(ticker)));
-    if (invalid.length) return Response.json({ error: `Invalid ticker format: ${invalid.join(", ")}` }, { status: 400 });
+    let holdings: string[];
+    try { holdings = validateMarketTickers(body.tickers); }
+    catch (error) { return Response.json({ error: error instanceof Error ? error.message : "Invalid data request." }, { status: 400 }); }
 
     const unique = [...new Set([...holdings, ...FACTOR_SYMBOLS])];
-    if (!holdings.length) return Response.json({ error: "Add at least one non-cash position." }, { status: 400 });
-    if (holdings.length > 30) return Response.json({ error: "The prototype currently supports up to 30 positions." }, { status: 400 });
 
-    const years = Math.max(7, Math.min(10, Number(body.years) || 3));
+    const years = Math.max(3, Math.min(10, Number(body.years) || 3));
     const period2 = new Date();
     period2.setUTCDate(period2.getUTCDate() + 1);
     const period1 = new Date(period2);

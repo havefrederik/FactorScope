@@ -56,5 +56,16 @@ export function buildExamplePortfolio(payload: MarketPayload, universe: string[]
   const cov=dailyReturns.reduce((s,r,i)=>s+(r-avg)*(benchmarkReturns[i]-bm),0)/Math.max(1,dailyReturns.length-1);
   let peak=1,maxDrawdown=0;curve.forEach(v=>{peak=Math.max(peak,v);maxDrawdown=Math.min(maxDrawdown,v/peak-1);});
   const analytics:PortfolioAnalytics={dates,curve,benchmarkCurve,dailyReturns,benchmarkReturns,totalReturn:curve.at(-1)!-1,benchmarkReturn:benchmarkCurve.at(-1)!-1,annualVolatility:Math.sqrt(v*252),beta:cov/Math.max(variance(benchmarkReturns),1e-12),maxDrawdown,pnl:days.at(-1)!.nav-1_000_000,startDate:dates[0],endDate:dates.at(-1)!,positions:[]};
-  return {tickers,days,rebalances,analytics,totalCosts,sharpe:v>1e-20?avg/Math.sqrt(v)*Math.sqrt(252):null};
+  const elapsedYears=(Date.parse(dates.at(-1)!)-Date.parse(dates[0]))/(365.25*86400000);
+  const annualReturn=elapsedYears>0?curve.at(-1)!**(1/elapsedYears)-1:null;
+  return {tickers,days,rebalances,analytics,totalCosts,annualReturn,sharpe:v>1e-20?avg/Math.sqrt(v)*Math.sqrt(252):null};
+}
+
+export type ExamplePortfolioResult = NonNullable<ReturnType<typeof buildExamplePortfolio>>;
+
+export function exampleHoldingsSnapshot(example: ExamplePortfolioResult, asOf?: string) {
+  const index=asOf?example.days.findLastIndex(day=>day.date<=asOf):example.days.length-1;
+  if(index<0)return null;
+  const day=example.days[index];
+  return {date:day.date,nav:day.nav,holdings:[...example.tickers.map((ticker,j)=>({ticker,value:day.values[j]})).filter(h=>h.value>1e-8),{ticker:"CASH",value:day.cash}]};
 }

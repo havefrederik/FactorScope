@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildExamplePortfolio } from "../lib/example-portfolio.ts";
+import { buildExamplePortfolio, exampleHoldingsSnapshot } from "../lib/example-portfolio.ts";
 
 function fixture(){
   const dates=[];for(let d=new Date('2024-12-31T00:00:00Z');d<=new Date('2025-03-10T00:00:00Z');d.setUTCDate(d.getUTCDate()+1))if(d.getUTCDay()%6)dates.push(d.toISOString().slice(0,10));
@@ -9,6 +9,21 @@ function fixture(){
   return {universe,payload:{series,asOf:dates.at(-1),source:'test',frequency:'daily',adjusted:true,errors:[],missingHoldings:[]}};
 }
 const near=(a,b,tol=1e-7)=>assert.ok(Math.abs(a-b)<tol,`${a} != ${b}`);
+test('annual return compounds back to total return over the exact displayed dates',()=>{
+ const {payload,universe}=fixture();const r=buildExamplePortfolio(payload,universe,'2025-01-01','2025-03-10',5);
+ const years=(Date.parse(r.analytics.endDate)-Date.parse(r.analytics.startDate))/(365.25*86400000);
+ near((1+r.annualReturn)**years,1+r.analytics.totalReturn);
+});
+test('risk snapshots use the actual dated holdings, retain cash and never select a future record',()=>{
+ const {payload,universe}=fixture();const r=buildExamplePortfolio(payload,universe,'2025-01-01','2025-03-10',5);
+ for(const date of ['2025-01-15','2025-01-18','2025-02-28']){
+  const snapshot=exampleHoldingsSnapshot(r,date);assert.ok(snapshot.date<=date);
+  const day=r.days.findLast(d=>d.date<=date);assert.equal(snapshot.date,day.date);
+  near(snapshot.holdings.reduce((s,h)=>s+h.value,0),day.nav);
+  for(const h of snapshot.holdings)near(h.value,h.ticker==='CASH'?day.cash:day.values[r.tickers.indexOf(h.ticker)]);
+ }
+ assert.equal(exampleHoldingsSnapshot(r,'2024-01-01'),null);
+});
 test('same-month ranking picks twenty names, caps starting weights, retains daily holdings and excludes incomplete month',()=>{
  const {payload,universe}=fixture();const result=buildExamplePortfolio(payload,universe,'2025-01-01','2025-03-10',0,1);
  assert.equal(result.rebalances.length,2);assert.equal(result.analytics.endDate,'2025-02-28');

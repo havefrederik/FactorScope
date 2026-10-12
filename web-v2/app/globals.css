@@ -185,6 +185,10 @@
 .example-controls input[type=number]{width:110px}.example-controls button{cursor:pointer;color:var(--cyan)}
 .example-controls>span{padding:12px 0}.example-chart{margin-top:24px;padding-bottom:18px}
 .example-portfolio .archive-metrics article:last-child strong{color:#e2eeee}
+.example-metrics{grid-template-columns:repeat(4,minmax(0,1fr))}
+.holdings-context{padding:15px 18px;margin:0 0 18px;border:1px solid #2b4b54;background:#102128;border-radius:6px;color:#acbdc5;font-size:.875rem;line-height:1.6}
+.holdings-context strong{color:#e6f2f3}
+@media(max-width:760px){.example-metrics{grid-template-columns:1fr}}
 .archive-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border:1px solid var(--line);border-radius:8px;margin:20px 0;background:#0c1419}
 .archive-metrics article{padding:22px;border-right:1px solid var(--line);display:grid;gap:12px}
 .archive-metrics article:last-child{border:0}

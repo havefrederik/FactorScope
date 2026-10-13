@@ -1,0 +1,52 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import test from "node:test";
+
+test("strategy analysis is point-in-time, risk targeted and explicit about constraints", async () => {
+  const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8") + await readFile(new URL("../app/strategy-workspace.tsx", import.meta.url), "utf8");
+  const analytics = await readFile(new URL("../lib/analytics.ts", import.meta.url), "utf8");
+  const allocator = await readFile(new URL("../lib/risk-allocation.ts", import.meta.url), "utf8");
+
+  assert.match(page, /"Strategy Analysis"/);
+  assert.match(page, /Allocation constraints/);
+  assert.match(page, /convex direction/);
+  assert.match(page, /Run backtest/);
+  assert.match(page, /Current → Proposed/);
+  assert.match(page, /Current/);
+  assert.match(page, /Proposed/);
+  assert.match(page, /Change/);
+  assert.match(page, /useDeferredValue/);
+  assert.match(page, /results show previous settings/);
+  assert.match(page, /Weekly/);
+  assert.match(page, /Monthly/);
+  assert.match(page, /Annual risk ceiling/);
+  assert.match(page, /S&amp;P 500 beta ceiling/);
+  assert.match(page, /min="0\.10" max="1\.30"/);
+  assert.match(page, /min="1" max="35"/);
+  assert.match(page, /Sharpe comparison/);
+  assert.match(page, /Sharpe ratio/);
+  assert.match(page, /CM-IEWMA/);
+  assert.doesNotMatch(page, /Rolling 126-day/);
+  assert.match(page, /Market betas use the preceding 126 sessions/);
+  assert.match(page, /next session/);
+  assert.match(page, /tightest risk, beta, position or capital ceiling/);
+  assert.match(page, /Risk budget → share/);
+
+  assert.match(analytics, /export function buildRiskTargetStrategy/);
+  assert.match(analytics, /export function buildRiskTargetSnapshot/);
+  assert.match(analytics, /const estimationEnd = dayIndex - 1/);
+  assert.match(analytics, /transactionCostBps/);
+  assert.match(analytics, /strategyRebalanceBucket/);
+  assert.match(analytics, /targetVolatility/);
+  assert.match(analytics, /targetBeta/);
+  assert.match(analytics, /maxPosition/);
+  assert.match(analytics, /annualizedSharpe/);
+  assert.match(analytics, /staticSharpeRatio/);
+  assert.match(analytics, /benchmarkSharpeRatio/);
+  assert.match(analytics, /createCombinedIewmaPredictor/);
+  assert.match(analytics, /const covarianceModel: CovarianceModel = "CM-IEWMA"/);
+  assert.match(analytics, /solveConstrainedRiskAllocation/);
+  assert.doesNotMatch(analytics, /160 \* \(portfolioVolatility - targetVolatility\)/);
+  assert.match(allocator, /minimize  1\/2 x' Sigma x - sum_i rho_i log\(x_i\)/);
+  assert.match(allocator, /bindingConstraints/);
+});

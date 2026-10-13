@@ -130,6 +130,8 @@ export type RiskTargetSnapshot = {
   investedWeight: number;
   cashWeight: number;
   currentCashWeight: number;
+  currentVolatility: number;
+  currentBeta: number;
   turnover: number;
   bindingConstraints: string[];
   solverStatus: "Solved" | "Numerical fallback";
@@ -652,6 +654,8 @@ export function buildRiskTargetSnapshot(payload: MarketPayload, holdings: Analyt
     investedWeight,
     cashWeight,
     currentCashWeight,
+    currentVolatility: strategyPortfolioVolatility(currentWeights, forecast.covarianceMatrix),
+    currentBeta: currentWeights.reduce((sum, weight, index) => sum + weight * betas[index], 0),
     turnover,
     bindingConstraints: allocation.bindingConstraints,
     solverStatus: allocation.solverStatus,

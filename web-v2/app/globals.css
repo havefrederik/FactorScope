@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-:root{--bg:#070a0d;--panel:#0e1318;--panel2:#111820;--line:#222c35;--line2:#303c47;--text:#edf2f5;--muted:#7e8a95;--cyan:#25d2c6;--cyan2:#168f8c;--purple:#7567ff;--amber:#e9aa50;--red:#f36a74;--green:#52cf87}
+:root{--bg:#101111;--panel:#181919;--panel2:#202121;--line:#303131;--line2:#444541;--text:#eeece7;--muted:#999a94;--cyan:#c9c3b4;--cyan2:#858174;--purple:#9c94ad;--amber:#cba66d;--red:#d17d81;--green:#8ea28e}
 *{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--text);font-family:Arial,Helvetica,sans-serif}button,input,select{font:inherit}.app-shell{min-height:100vh;background:radial-gradient(circle at 80% 0,#111d26 0,transparent 26%),var(--bg)}
 .topbar{height:66px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 24px 0 20px;position:fixed;left:0;right:0;top:0;background:#090d11ed;backdrop-filter:blur(18px);z-index:10}.brand{display:flex;align-items:center;gap:12px;font-weight:700;font-size:18px;letter-spacing:-.02em}.brandmark{width:31px;height:31px;border-radius:7px;background:var(--cyan);color:#051313;display:grid;place-items:center;font-weight:900}.brand em{font-style:normal;color:#62717c;font-size:10px;letter-spacing:.16em;margin-left:4px}.top-meta{display:flex;align-items:center;gap:13px;color:#91a0aa;font-size:12px}.top-meta b{color:#34414b}.top-meta button,.edit-btn{border:1px solid var(--line2);background:#121920;color:var(--text);border-radius:7px;padding:8px 12px}.avatar{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:#27343d;color:#c9d2d8;font-size:11px}.live-dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 0 4px #52cf871c}
 .error-dot{background:var(--red);box-shadow:0 0 0 4px #f36a741c}
@@ -434,3 +434,44 @@
 .method-conventions{grid-column:1/-1}
 .method-conventions .method-list>div>span{font-size:11px;line-height:1.65}
 .method-conventions .method-list>div>b{font-size:11px}
+
+/* Compact navigation and a neutral analytical workspace. */
+.app-shell{background:var(--bg)}
+.panel,.overview-decomposition,.archive-metrics,.metrics{background:var(--panel)}
+.topbar{position:relative;height:58px;padding:0 24px;background:#151616;gap:28px;backdrop-filter:none;z-index:10}
+.brand{flex-shrink:0;font-size:17px;gap:9px}.brandmark{width:27px;height:27px;border-radius:5px;color:#20211f;background:var(--cyan)}
+.topbar .primary-navigation{display:flex;align-self:stretch;gap:4px;margin:0;flex:1;align-items:stretch;overflow-x:auto}
+.primary-navigation button{background:transparent;border:0;border-bottom:2px solid transparent;border-radius:0;color:#a0a19a;font-size:12px;padding:0 17px;white-space:nowrap;cursor:pointer;font-weight:500}
+.primary-navigation button:hover{color:var(--text);background:#202121}.primary-navigation button.active{color:var(--text);border-bottom-color:var(--cyan);background:#1d1e1d}.primary-navigation button:disabled{opacity:.4;cursor:not-allowed}
+.primary-navigation button:focus-visible,.portfolio-tools button:focus-visible,.portfolio-tools .upload:focus-within{outline:2px solid var(--cyan);outline-offset:-3px}
+.top-meta{font-size:10px;gap:9px;color:var(--muted)}.top-meta .avatar{display:none}.top-meta b{color:#5b5d57}.live-dot{background:var(--green);box-shadow:none}.error-dot{background:var(--red)}
+.portfolio-toolbar{display:flex;align-items:center;gap:14px;padding:10px 24px;min-height:54px;border-bottom:1px solid var(--line);background:#171818}
+.portfolio-toolbar .portfolio-switcher{margin:0;flex-shrink:0}.portfolio-toolbar .portfolio-switcher select{width:210px;background:#1b1c1b;border:1px solid var(--line2);color:var(--text);border-radius:5px;padding:7px 9px;font-size:11px}
+.toolbar-badge{font-size:8px;letter-spacing:.1em;color:#aaa99f;border:1px solid #41423d;padding:3px 5px;border-radius:3px}
+.toolbar-value{font:13px var(--font-geist-mono),monospace;border-left:1px solid var(--line);padding-left:14px;white-space:nowrap}
+.toolbar-holdings{color:var(--muted);font-size:10px;white-space:nowrap}
+.portfolio-tools{display:flex;gap:6px;align-items:center;margin-left:auto;flex-shrink:0}.portfolio-tools button,.portfolio-tools .upload{display:flex;align-items:center;gap:5px;margin:0;padding:7px 9px;border:1px solid var(--line);border-radius:4px;background:transparent;color:#b9bbb3;font-size:10px;cursor:pointer}.portfolio-tools button:hover,.portfolio-tools .upload:hover{border-color:var(--line2);color:var(--text)}.portfolio-tools .icon{width:auto}
+.workspace{margin:0 auto;padding:22px 24px 40px;max-width:1900px;min-width:0;width:100%}
+.page-head{gap:20px}.page-head h1{font-size:28px}.page-head p{font-size:12px;color:var(--muted)}
+.section-tabs{background:#171818;border-color:var(--line)}.section-tabs button.active,.segmented button.active,.compare-toolbar select{background:#2c2d29;border-color:#57594f;color:var(--text)}
+.panel-title span,.metric>span,.metric small,.kicker,.eyebrow{color:var(--muted)}
+.example-controls input,.example-controls button,.date-control label,.date-control input,.archive-date-heading select{background:#1c1d1c;border-color:var(--line2);color:var(--text)}
+.example-portfolio .example-context{color:var(--muted)}.example-portfolio .page-head h1{font-size:28px}
+.portfolio-overview-grid{display:grid;grid-template-columns:minmax(0,1fr) 410px;gap:16px;align-items:start;margin-top:16px}
+.portfolio-chart-stack{min-width:0;display:grid;gap:16px}.portfolio-chart-stack .example-chart,.example-portfolio .portfolio-overview-grid .example-holdings{margin:0}
+.example-portfolio .example-holdings{position:sticky;top:16px;min-width:0;background:var(--panel)}
+.example-portfolio .archive-date-heading{align-items:start;gap:10px;flex-direction:column}.example-portfolio .archive-date-heading h2{font-size:14px}.example-portfolio .archive-date-heading p{font-size:10px;color:var(--muted)}
+.example-portfolio .archive-date-heading label{display:flex;align-items:center;justify-content:space-between;width:100%;font-size:10px}.example-portfolio .archive-date-heading select{min-height:30px;font-size:11px}
+.example-portfolio .archive-date-summary{font-size:10px;gap:7px 12px}.example-portfolio .archive-date-summary span:first-child{display:none}.example-portfolio .archive-date-summary b{margin-left:4px}
+.example-portfolio .archive-table-scroll{max-height:560px;overflow:auto;scrollbar-width:thin;scrollbar-color:#56574e #1c1d1c}
+.example-portfolio .archive-holdings table{min-width:0;font-size:11px;table-layout:fixed}.example-portfolio .archive-holdings th,.example-portfolio .archive-holdings td{padding:9px 10px;white-space:nowrap}.example-portfolio .archive-holdings thead{position:sticky;top:0;background:#222320;z-index:1}.example-portfolio .archive-holdings thead th{font-size:9px}.example-portfolio .archive-holdings th:first-child{width:23%}.example-portfolio .archive-holdings th:nth-child(2){width:29%}.example-portfolio .archive-holdings th:nth-child(3),.example-portfolio .archive-holdings th:nth-child(4){width:24%}
+.example-portfolio .example-stock-link{font-size:11px;gap:4px}.example-portfolio .example-stock-link span{display:none}.example-portfolio .example-stock-link:after{content:'↗';font-size:9px;color:var(--muted)}
+.example-portfolio .overview-decomposition .decomposition-chart{height:460px}.decomposition-frame{background:#111212;border-color:var(--line)}.decomposition-legend{background:rgba(20,21,20,.94);border-color:var(--line);box-shadow:none}.decomposition-legend>strong,.decomposition-legend em{color:#9b9e94}
+.decomposition-toolbar{border-color:var(--line)}.decomposition-toolbar button{background:#1b1c1b;border-color:var(--line2);color:#b1b3a9}.decomposition-toolbar button.active{background:var(--cyan);color:#20211f;border-color:var(--cyan)}
+.chart-definition{color:var(--muted)}.benchmark-line{stroke:#9c94ad}.performance-legend i.benchmark-swatch{background:#9c94ad}
+.decomposition-systematic-line,.decomposition-leader.decomp-systematic{stroke:var(--cyan)}.decomposition-legend i.decomp-systematic,.decomposition-end-labels .decomp-systematic{background:var(--cyan)}
+.compare-effect-total{background:#292a26}.compare-effect-total th,.compare-effect-total td{border-color:var(--line2)}
+@media(max-width:1400px){.top-meta{max-width:210px;white-space:nowrap;overflow:hidden}.top-meta>b{display:none}.primary-navigation button{padding:0 13px}.portfolio-overview-grid{grid-template-columns:minmax(0,1fr) 380px}}
+@media(max-width:1180px){.top-meta{display:none}.toolbar-holdings{display:none}.portfolio-overview-grid{grid-template-columns:minmax(0,1fr) 350px}.example-portfolio .archive-holdings th,.example-portfolio .archive-holdings td{padding:9px 7px}}
+@media(max-width:1000px){.portfolio-overview-grid{grid-template-columns:1fr}.example-portfolio .example-holdings{position:static}.example-portfolio .archive-date-heading{flex-direction:row}.example-portfolio .archive-date-heading label{width:auto;display:grid}.example-portfolio .archive-table-scroll{max-height:380px}.example-portfolio .archive-holdings table{table-layout:auto}.example-portfolio .example-stock-link span{display:inline}.example-portfolio .example-stock-link:after{display:none}}
+@media(max-width:760px){.topbar{height:auto;min-height:54px;padding:10px 14px 0;gap:8px;flex-wrap:wrap}.brand{font-size:16px}.topbar .primary-navigation{flex:0 0 100%;min-height:42px;gap:0}.primary-navigation button{font-size:11px;padding:0 12px;flex:1}.portfolio-toolbar{padding:10px 14px;gap:10px;flex-wrap:wrap}.toolbar-badge{display:none}.toolbar-value{font-size:12px;padding-left:10px}.portfolio-tools{width:100%;margin-left:0}.portfolio-tools .upload{margin-right:auto}.workspace{padding:16px 14px 30px}.example-portfolio .archive-date-heading{flex-direction:column}.example-portfolio .archive-date-heading label{display:flex;width:100%}.example-portfolio .overview-decomposition .decomposition-chart{height:360px}.example-portfolio .example-controls>span{font-size:10px}.example-portfolio .page-head h1,.page-head h1{font-size:25px}.page-head{align-items:start;flex-direction:column}.date-control{flex-wrap:wrap}.site-footer{flex-wrap:wrap}.site-footer b{margin-left:0}}

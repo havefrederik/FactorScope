@@ -511,31 +511,27 @@ export default function Home() {
   return (
     <main className="app-shell">
       <header className="topbar">
-        <div className="brand"><span className="brandmark">F</span><span>FactorScope</span><em>PORTFOLIO INTELLIGENCE</em></div>
+        <div className="brand"><span className="brandmark">F</span><span>FactorScope</span></div>
+        <nav className="primary-navigation" aria-label="Primary navigation">
+          <button onClick={()=>setView("Overview")} aria-current={primarySection==="Portfolio"?"page":undefined} className={primarySection==="Portfolio"?"active":""}>Portfolio</button>
+          <button disabled={isArchivedPortfolio} onClick={()=>{setView("Risk Analysis");setRiskTab("Factors")}} aria-current={primarySection==="Risk & Attribution"?"page":undefined} className={primarySection==="Risk & Attribution"?"active":""}>Risk &amp; Attribution</button>
+          <button disabled={isArchivedPortfolio} onClick={()=>setView("Compare")} aria-current={primarySection==="Strategy Lab"?"page":undefined} className={primarySection==="Strategy Lab"?"active":""}>Strategy Lab</button>
+          <button onClick={()=>setView("Methodology")} aria-current={primarySection==="About"?"page":undefined} className={primarySection==="About"?"active":""}>About</button>
+        </nav>
         <div className="top-meta">{isArchivedPortfolio?<>Published archive · through 2026-04-27 <b>•</b> Paper simulation</>:<><span className={`live-dot ${dataError ? "error-dot" : missingHoldings.length ? "warning-dot" : ""}`} /> {loading ? "Loading Yahoo data" : dataError ? dataErrorKind === "request" ? "Invalid data request" : "Data connection issue" : missingHoldings.length ? `${missingHoldings.length} ticker${missingHoldings.length>1?"s":""} unavailable` : `Yahoo Finance · through ${marketData?.asOf ?? "latest"}`} <b>•</b> Daily adjusted</>} <div className="avatar">FS</div></div>
       </header>
 
-      <aside className="sidebar">
-        <section className="portfolio-card">
-          <div className="eyebrow">CURRENT PORTFOLIO</div>
-          <label className="portfolio-switcher"><span>DEMO</span><select value={portfolioSource==="demo"?demoKey:"uploaded"} onChange={event=>event.target.value!=="uploaded"&&loadDemo(event.target.value as DemoKey)}><option value="example">US Equity Portfolio</option>{portfolioSource==="uploaded"&&<option value="uploaded">Uploaded portfolio</option>}</select></label>
-          <div className="portfolio-name"><strong>{portfolioName}</strong></div>
-          <div className="demo-badge">{isArchivedPortfolio?"PUBLISHED ARCHIVE":isPublishedFund?"PUBLISHED FUND":portfolioSource==="demo"?"DEMO PORTFOLIO":"UPLOADED PORTFOLIO"}</div>
-          <div className="portfolio-total">{money(total)}</div><div className="muted">{isExample?`Holdings · ${exampleSnapshot?.date??"loading"}`:isArchivedPortfolio?"Starting paper value":isPublishedFund?"1 fund share class":`${holdings.filter(h => h.ticker !== "CASH").length} positions`} · USD{hasShort?` · ${(grossExposure/Math.max(total,1)*100).toFixed(0)}% gross`:""}</div>
-          {!isPublishedFund&&!isReadOnlyPortfolio&&<button className="edit-btn" onClick={() => setEditing(current=>!current)}>{editing ? "Close editor" : "Edit portfolio"}</button>}
-        </section>
-        <nav className="primary-navigation" aria-label="Primary navigation">
-          <button onClick={()=>setView("Overview")} className={primarySection==="Portfolio"?"active":""}><Icon name="grid"/><span><b>Portfolio</b><small>{isReadOnlyPortfolio?"Performance & daily holdings":"Overview, performance & events"}</small></span></button>
-          <button disabled={isArchivedPortfolio} title={isArchivedPortfolio?"Choose US Equity Portfolio to use risk tools":undefined} onClick={()=>{setView("Risk Analysis");setRiskTab("Factors")}} className={primarySection==="Risk & Attribution"?"active":""}><Icon name="factor"/><span><b>Risk &amp; Attribution</b><small>Factors, covariance &amp; positions</small></span></button>
-          <button disabled={isArchivedPortfolio} title={isArchivedPortfolio?"Choose US Equity Portfolio to construct allocations":undefined} onClick={()=>setView("Compare")} className={primarySection==="Strategy Lab"?"active":""}><Icon name="strategy"/><span><b>Strategy Lab</b><small>Compare, construct &amp; stress</small></span></button>
-          <button onClick={()=>setView("Methodology")} className={primarySection==="About"?"active":""}><Icon name="method"/><span><b>About</b><small>Methodology &amp; project brief</small></span></button>
-        </nav>
-        <section className="sidebar-actions">
-          <label className="upload"><Icon name="upload" /> Upload CSV<input type="file" accept=".csv" onChange={upload} /></label>
-          <button onClick={resetDemo}><Icon name="reset" /> Reset demo</button>
-        </section>
-        {isArchivedPortfolio?<><section className="model-card"><div className="eyebrow">SOURCE</div><strong>Cvxportfolio archive</strong><span>Original holdings and targets</span><span>Fixed publication snapshot</span></section><p className="sidebar-note">Choose US Equity Portfolio to use risk forecasts and Strategy Lab. This archive preserves the authors’ allocations.</p></>:<><section className="model-card"><div className="eyebrow">MODEL</div><strong>ETF Proxy Factor Model</strong><span>Custom date range · daily</span><span className={dataError ? "model-error" : "healthy"}>{dataError ? "● Data unavailable" : loading ? "● Refreshing" : "● Live data ready"}</span></section><p className="sidebar-note">Prototype market data is supplied by Yahoo Finance. Factor and scenario sensitivities are estimates, not forecasts.</p></>}
-      </aside>
+      <section className="portfolio-toolbar" aria-label="Current portfolio">
+        <label className="portfolio-switcher"><select aria-label="Choose portfolio" value={portfolioSource==="demo"?demoKey:"uploaded"} onChange={event=>event.target.value!=="uploaded"&&loadDemo(event.target.value as DemoKey)}><option value="example">US Equity Portfolio</option>{portfolioSource==="uploaded"&&<option value="uploaded">Uploaded portfolio</option>}</select></label>
+        <span className="toolbar-badge">{portfolioSource==="demo"?"DEMO":"UPLOADED"}</span>
+        <strong className="toolbar-value">{money(total)}</strong>
+        <span className="toolbar-holdings">{holdings.filter(h=>h.ticker!=="CASH"&&h.value!==0).length} positions · USD{isExample&&exampleSnapshot?` · ${exampleSnapshot.date}`:""}{hasShort?` · ${(grossExposure/Math.max(total,1)*100).toFixed(0)}% gross`:""}</span>
+        <div className="portfolio-tools">
+          {!isPublishedFund&&!isReadOnlyPortfolio&&<button onClick={()=>setEditing(current=>!current)}>{editing?"Close editor":"Edit portfolio"}</button>}
+          <label className="upload"><Icon name="upload"/>Upload CSV<input type="file" accept=".csv" onChange={upload}/></label>
+          <button onClick={resetDemo}>Reset demo</button>
+        </div>
+      </section>
 
       <section className="workspace">
         {isArchivedPortfolio&&primarySection!=="About"?<PublishedDowPortfolio/>:isExample&&view==="Overview"?exampleWorkspace:<>

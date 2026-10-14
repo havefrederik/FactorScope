@@ -4,8 +4,9 @@ import { mkdtemp, readFile, writeFile, rm } from "node:fs/promises";
 import ts from "typescript";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { comparisonPresetWeights, comparisonHoldings, replayStatistics } from "../lib/comparison-portfolio.ts";
-import { buildAnalytics } from "../lib/analytics.ts";
+import { allocationAttributionEffects, comparisonPresetWeights, comparisonHoldings, replayStatistics } from "../lib/comparison-portfolio.ts";
+import { buildAnalytics, buildFactorModel } from "../lib/analytics.ts";
+import { summarizeCovariance } from "../lib/covariance-comparison.ts";
 
 test("lower-beta preset changes stock weights, caps positions and preserves total capital with explicit cash", () => {
   const holdings = Array.from({ length: 40 }, (_, index) => ({ ticker: `S${index}`, value: 25000 }));
@@ -75,5 +76,34 @@ test("exposure plot places positive and negative exposures on opposite sides of 
     assert.ok(Math.abs(rectangles[1].x + rectangles[1].width - zero) < 1e-9);
     assert.match(html, /Quality: -0\.350/);
     assert.match(html, /Bars show signed exposure/);
+    assert.match(html, /aria-label="Exposure label precision"/);
+    assert.match(html, /6 decimals/);
+    assert.match(html, /role="button" tabindex="0" aria-label="Quality: Current portfolio -0\.350000"/);
   } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+test("cash dilution reduces absolute forecast risk without inventing a change in risky-asset variance shares", () => {
+  const covariance = [[.04, .012], [.012, .09]];
+  const current = summarizeCovariance(covariance, ["AAA", "BBB"], [.4, .6]);
+  const alternative = summarizeCovariance(covariance, ["AAA", "BBB"], [.2, .3]);
+  assert.equal(alternative.portfolioVolatility, current.portfolioVolatility / 2);
+  current.securities.forEach((item, index) => assert.ok(Math.abs(item.riskShare - alternative.securities[index].riskShare) < 1e-12));
+});
+
+test("factor and idiosyncratic attribution effects reconcile to the portfolio P&L difference", () => {
+  const dates = [];
+  for (let day = new Date("2025-01-01T00:00:00Z"); dates.length < 160; day.setUTCDate(day.getUTCDate() + 1)) if (day.getUTCDay() % 6) dates.push(day.toISOString().slice(0, 10));
+  const tickers = ["AAA", "BBB", "SPY", "IWM", "IWD", "IWF", "MTUM", "QUAL", "USMV", "VYM", "XLK", "XLF", "XLE", "XLV", "XLC", "XLY", "XLP", "XLI", "XLB", "XLRE", "XLU"];
+  const series = Object.fromEntries(tickers.map((ticker, asset) => { let close = 100; return [ticker, { points: dates.map((date, index) => { close *= 1 + .0001 + .005 * Math.sin(index * .4) + .002 * Math.sin(index * (.12 + asset * .047)); return { date, close }; }) }]; }));
+  const payload = { series, asOf: dates.at(-1) }, window = { startDate: dates[0], endDate: dates.at(-1) };
+  const holdings = [{ ticker: "AAA", value: 700000 }, { ticker: "BBB", value: 300000 }, { ticker: "CASH", value: 0 }];
+  const current = buildAnalytics(payload, holdings, window);
+  const alternative = buildAnalytics(payload, comparisonHoldings(holdings, { AAA: .1, BBB: .6 }), window);
+  const models = [buildFactorModel(payload, current, 1e6), buildFactorModel(payload, alternative, 1e6)];
+  assert.ok(models.every(Boolean));
+  const effects = allocationAttributionEffects(...models);
+  assert.ok(Math.abs(effects.reduce((sum, row) => sum + row.returnChange, 0) - (alternative.pnl - current.pnl)) < 1e-6);
+  assert.ok(Math.abs(effects.reduce((sum, row) => sum + row.riskShareChange, 0)) < 1e-6);
+  const matched = allocationAttributionEffects(models[0], models[0]);
+  assert.ok(matched.every(row => row.returnChange === 0 && row.riskShareChange === 0));
 });

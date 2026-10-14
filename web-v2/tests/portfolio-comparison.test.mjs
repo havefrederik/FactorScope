@@ -25,7 +25,7 @@ test("supports direct weight editing and saved-baseline portfolio comparison", a
   assert.match(page, /Save current as baseline/);
   assert.match(page, /secondaryLabel="Alternative portfolio"/);
   assert.match(page, /Allocation changes/);
-  assert.match(page, /Factor exposure changes/);
+  assert.match(page, /Factor comparison/);
   assert.match(page, /setBaselineHoldings\(portfolio\.map/);
 });
 

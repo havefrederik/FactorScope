@@ -1,4 +1,4 @@
-import type { AnalyticsHolding } from "./analytics.ts";
+import type { AnalyticsHolding, FactorModelAnalytics } from "./analytics.ts";
 
 export type ComparisonPreset = "Lower beta" | "Equal weight" | "Current weights" | "Saved baseline";
 
@@ -55,4 +55,17 @@ export function replayStatistics(dates: string[], dailyReturns: number[], totalR
   const mean = dailyReturns.reduce((sum, value) => sum + value, 0) / Math.max(dailyReturns.length, 1);
   const variance = dailyReturns.reduce((sum, value) => sum + (value - mean) ** 2, 0) / Math.max(dailyReturns.length - 1, 1);
   return { annualReturn, sharpe: variance > 1e-16 ? Math.sqrt(252) * mean / Math.sqrt(variance) : null };
+}
+
+export function allocationAttributionEffects(current: FactorModelAnalytics, alternative: FactorModelAnalytics) {
+  const before = new Map(current.layers.map(layer => [layer.name, layer]));
+  return alternative.layers.map(layer => ({
+    name: layer.name,
+    currentReturn: before.get(layer.name)?.returnAttribution ?? 0,
+    alternativeReturn: layer.returnAttribution,
+    returnChange: layer.returnAttribution - (before.get(layer.name)?.returnAttribution ?? 0),
+    currentRiskShare: before.get(layer.name)?.riskShare ?? 0,
+    alternativeRiskShare: layer.riskShare,
+    riskShareChange: layer.riskShare - (before.get(layer.name)?.riskShare ?? 0),
+  }));
 }

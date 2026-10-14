@@ -405,3 +405,28 @@
 .refined-factor-layout .factor-table{grid-row:span 2}
 @media(max-width:1100px){.compare-grid{grid-template-columns:1fr}.compare-holdings-scroll{max-height:330px}.compare-toolbar>span{margin-left:0}}
 @media(max-width:760px){.compare-toolbar label{flex-wrap:wrap}.compare-chart-toolbar>span{margin-left:0}.compare-workspace th,.compare-workspace td{padding:8px}.exposure-plot svg{min-width:620px}}
+
+.exposure-precision{display:flex;align-items:center;gap:6px;margin-left:auto;color:#a8bcc7;font-size:11px}
+.exposure-precision select,.exposure-export{border:1px solid #36515f;border-radius:4px;background:#111e26;color:#c9dce6;padding:6px 8px;font:inherit;font-size:11px}
+.exposure-export{cursor:pointer;color:var(--cyan)}
+.exposure-inspector{display:flex;gap:12px 24px;align-items:center;flex-wrap:wrap;min-height:62px;padding:10px 14px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:#0d171e;box-sizing:border-box}
+.exposure-inspector>p{margin:0;color:#9ab0bd;font-size:11px;line-height:1.5}
+.exposure-inspector>div{display:grid;gap:5px}
+.exposure-inspector strong{color:#d4e4ec;font-size:12px;font-weight:500}
+.exposure-inspector span,.exposure-inspector small{font-size:10px;color:#93acbb}
+.exposure-inspector b{color:var(--cyan);font:14px var(--font-geist-mono),monospace}
+.exposure-inspector b.alternative{color:var(--purple)}
+.exposure-inspector>button{margin-left:auto;border:1px solid #3a5361;border-radius:4px;background:#14232b;color:#b7d0de;padding:5px 8px;font-size:10px;cursor:pointer}
+.exposure-interactive-row{cursor:pointer;outline:none}
+.exposure-hit-area{fill:transparent}
+.exposure-interactive-row:hover .exposure-hit-area,.exposure-interactive-row.selected .exposure-hit-area{fill:rgba(63,157,177,.08)}
+.exposure-interactive-row:focus-visible .exposure-hit-area{stroke:var(--cyan);stroke-width:1.5}
+.exposure-precision select:focus-visible,.exposure-export:focus-visible,.exposure-inspector>button:focus-visible{outline:2px solid var(--cyan);outline-offset:3px}
+@media(max-width:760px){.exposure-precision{margin-left:0}.exposure-inspector{gap:10px 18px}.exposure-inspector b{font-size:12px}}
+
+.compare-effect-note{margin:0;padding:10px 12px;border-left:2px solid var(--cyan);background:#0d1b21;color:#a9c0cc;font-size:11px;line-height:1.55}
+.compare-effect-note strong{color:#d6e8ef;font-weight:500}
+.compare-factor-effects{min-width:720px}
+.compare-effect-total{background:#111f26;font-weight:600}
+.compare-effect-total th,.compare-effect-total td{border-top:1px solid #3d5967}
+.compare-attribution-effects table{min-width:520px}

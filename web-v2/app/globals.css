@@ -430,3 +430,7 @@
 .compare-effect-total{background:#111f26;font-weight:600}
 .compare-effect-total th,.compare-effect-total td{border-top:1px solid #3d5967}
 .compare-attribution-effects table{min-width:520px}
+
+.method-conventions{grid-column:1/-1}
+.method-conventions .method-list>div>span{font-size:11px;line-height:1.65}
+.method-conventions .method-list>div>b{font-size:11px}

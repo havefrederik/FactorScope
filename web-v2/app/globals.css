@@ -475,3 +475,22 @@
 @media(max-width:1180px){.top-meta{display:none}.toolbar-holdings{display:none}.portfolio-overview-grid{grid-template-columns:minmax(0,1fr) 350px}.example-portfolio .archive-holdings th,.example-portfolio .archive-holdings td{padding:9px 7px}}
 @media(max-width:1000px){.portfolio-overview-grid{grid-template-columns:1fr}.example-portfolio .example-holdings{position:static}.example-portfolio .archive-date-heading{flex-direction:row}.example-portfolio .archive-date-heading label{width:auto;display:grid}.example-portfolio .archive-table-scroll{max-height:380px}.example-portfolio .archive-holdings table{table-layout:auto}.example-portfolio .example-stock-link span{display:inline}.example-portfolio .example-stock-link:after{display:none}}
 @media(max-width:760px){.topbar{height:auto;min-height:54px;padding:10px 14px 0;gap:8px;flex-wrap:wrap}.brand{font-size:16px}.topbar .primary-navigation{flex:0 0 100%;min-height:42px;gap:0}.primary-navigation button{font-size:11px;padding:0 12px;flex:1}.portfolio-toolbar{padding:10px 14px;gap:10px;flex-wrap:wrap}.toolbar-badge{display:none}.toolbar-value{font-size:12px;padding-left:10px}.portfolio-tools{width:100%;margin-left:0}.portfolio-tools .upload{margin-right:auto}.workspace{padding:16px 14px 30px}.example-portfolio .archive-date-heading{flex-direction:column}.example-portfolio .archive-date-heading label{display:flex;width:100%}.example-portfolio .overview-decomposition .decomposition-chart{height:360px}.example-portfolio .example-controls>span{font-size:10px}.example-portfolio .page-head h1,.page-head h1{font-size:25px}.page-head{align-items:start;flex-direction:column}.date-control{flex-wrap:wrap}.site-footer{flex-wrap:wrap}.site-footer b{margin-left:0}}
+
+/* Keep the overview results within a compact header band. */
+.portfolio-toolbar{min-height:44px;padding-top:6px;padding-bottom:6px}
+.workspace{padding-top:14px}
+.example-summary-head{display:flex;align-items:center;gap:18px;flex-wrap:wrap;min-height:34px;margin:0 0 8px}
+.example-summary-head h1{font-size:18px;font-weight:550;letter-spacing:-.025em;margin:0;white-space:nowrap}
+.example-portfolio .example-summary-head .example-controls{margin:0;gap:10px;align-items:center;font-size:10px}
+.example-portfolio .example-summary-head .example-controls label{display:flex;align-items:center;gap:6px;white-space:nowrap;color:var(--muted)}
+.example-portfolio .example-summary-head .example-controls input,.example-portfolio .example-summary-head .example-controls button{min-height:28px;height:28px;padding:4px 7px;font-size:11px}
+.example-portfolio .example-summary-head input[type=month]{width:132px}.example-portfolio .example-summary-head input[type=number]{width:52px}
+.example-period{margin-left:auto;font-size:10px;white-space:nowrap;color:var(--muted);font-variant-numeric:tabular-nums}
+.example-portfolio .example-metrics{margin:0;border-radius:5px}
+.example-portfolio .example-metrics article{grid-template-columns:minmax(0,1fr) auto;align-items:baseline;gap:3px 10px;padding:9px 12px}
+.example-portfolio .example-metrics article>span{font-size:9px;letter-spacing:.06em}
+.example-portfolio .example-metrics article strong{font-size:21px;line-height:1.2}
+.example-portfolio .example-metrics article small{grid-column:1/-1;font-size:10px;line-height:1.3}
+.example-portfolio .portfolio-overview-grid{margin-top:10px}
+@media(max-width:1100px){.example-period{margin-left:0}.example-portfolio .example-metrics{grid-template-columns:repeat(4,minmax(0,1fr))}.example-portfolio .example-metrics article{grid-template-columns:1fr}.example-portfolio .example-metrics article small{grid-column:auto}}
+@media(max-width:760px){.example-summary-head{gap:8px 12px}.example-summary-head h1{font-size:17px}.example-portfolio .example-summary-head .example-controls{flex:1 0 100%;flex-wrap:wrap;gap:8px}.example-period{font-size:9px}.example-portfolio .example-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.example-portfolio .example-metrics article{grid-template-columns:minmax(0,1fr) auto;padding:8px 10px}.example-portfolio .example-metrics article small{grid-column:1/-1}.example-portfolio .example-metrics article>span{font-size:8px}.example-portfolio .example-metrics article strong{font-size:19px}.example-portfolio .example-metrics article:nth-child(-n+2){border-bottom:1px solid var(--line)}}

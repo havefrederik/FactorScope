@@ -2,8 +2,9 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { buildPortfolioDecomposition, type MarketPayload, type PortfolioAnalytics, type SecurityDecomposition } from "@/lib/analytics";
 import type { ExamplePortfolioResult } from "@/lib/example-portfolio";
-import { buildPortfolioGroups, groupHoldingsSnapshot } from "@/lib/portfolio-groups";
+import { buildPortfolioGroups } from "@/lib/portfolio-groups";
 import GroupReturnsChart, { groupColors } from "./group-returns-chart";
+import PortfolioHoldings from "./portfolio-holdings";
 
 const money=(n:number)=>new Intl.NumberFormat("en-US",{style:"currency",currency:"USD",maximumFractionDigits:0}).format(n);
 const pct=(n:number)=>`${(100*n).toFixed(2)}%`;
@@ -16,9 +17,9 @@ export default function ExamplePortfolio({payload,example,sectors,firstMonth,set
   const [selectedGroup,setSelectedGroup]=useState<string|null>(null);
   const index=Math.max(0,selectedDate?example.days.findIndex(day=>day.date===selectedDate):example.days.length-1);
   const day=example.days[index],rebalance=example.rebalances[day.rebalance];
-  const sectorRows=groupHoldingsSnapshot(example,grouped.groups,index);
   function selectGroup(name:string|null){setSelectedGroup(name);setGrouping("Sectors");setChartView("Returns by group");}
-  const rows=example.tickers.map((ticker,i)=>({ticker,value:day.values[i],target:rebalance?.targets[i]??0,score:rebalance?.scores[i]??null})).filter(row=>row.value!==0||row.target!==0).sort((a,b)=>b.value-a.value);
+  const positions=[...example.tickers.map((ticker,i)=>({ticker,sector:sectors[ticker]??"Unclassified",value:day.values[i]})).filter(row=>row.value!==0||(rebalance?.targets[example.tickers.indexOf(row.ticker)]??0)!==0),{ticker:"CASH",sector:"Cash",value:day.cash}];
+  const allocation=rebalance?{date:rebalance.date,weights:Object.fromEntries(example.tickers.map((ticker,i)=>[ticker,rebalance.targets[i]]))}:undefined;
   function download(){
     if(!example)return;
     const lines=["date,ticker,value_usd,weight,target_weight,rebalance_month,portfolio_type"];
@@ -56,27 +57,7 @@ export default function ExamplePortfolio({payload,example,sectors,firstMonth,set
             <article title="Historical market beta against the S&P 500"><span>Market beta</span><strong>{example.analytics.beta.toFixed(2)}</strong></article>
           </div>
         </section>
-        <section className="panel archive-holdings example-holdings">
-          <div className="archive-date-panel">
-            <div className="archive-date-heading">
-              <div><h2>Holdings on {day.date}</h2><p id="example-weight-help">Weight on date includes price drift. At rebalance is the monthly starting allocation.</p></div>
-              <label>Holdings date<select aria-label="Example holdings date" value={day.date} onChange={e=>setSelectedDate(e.target.value)}>{example.days.map(d=><option key={d.date}>{d.date}</option>)}</select></label>
-            </div>
-            <input className="archive-date-slider" type="range" min="0" max={example.days.length-1} value={index} onChange={e=>setSelectedDate(example.days[Number(e.target.value)].date)} aria-label="Example portfolio history date" aria-valuetext={day.date}/>
-            <div className="archive-date-summary"><span>Portfolio value <b>{money(day.nav)}</b></span><span>Cash <b>{pct(day.cash/day.nav)}</b></span><span>Rebalance month <b>{rebalance?.month??"Initial cash"}</b></span></div>
-          </div>
-          <div className="holdings-grouping" aria-label="Group portfolio holdings">{(["Stocks","Sectors"] as const).map(mode=><button key={mode} aria-pressed={grouping===mode} className={grouping===mode?"active":""} onClick={()=>{setGrouping(mode);if(mode==="Sectors")setChartView("Returns by group");}}>{mode}</button>)}</div>
-          <div className={"archive-table-scroll"+(grouping==="Sectors"?" sector-holdings":"")}>
-            <table aria-describedby="example-weight-help">
-              <thead><tr><th scope="col">{grouping==="Stocks"?"Security":"Sector"}</th><th scope="col">Value</th><th scope="col" title={`Position value divided by portfolio value on ${day.date}`}>Weight on date</th><th scope="col" title="Allocation set at the monthly rebalance, before subsequent price changes">At rebalance</th></tr></thead>
-              <tbody>
-                {grouping==="Stocks"?rows.map(row=><tr key={row.ticker}><th><button className="example-stock-link" aria-label={`Analyze ${row.ticker} security`} onClick={()=>onSelectTicker(row.ticker)}>{row.ticker}<span>Analyze →</span></button></th><td>{money(row.value)}</td><td>{pct(row.value/day.nav)}</td><td>{pct(row.target)}</td></tr>):sectorRows.map(row=><tr key={row.name} className={selectedGroup===row.name?"selected-sector":""}><th><button className="sector-holding-link" aria-pressed={selectedGroup===row.name} onClick={()=>selectGroup(selectedGroup===row.name?null:row.name)}><i style={{background:groupColors[grouped.groups.findIndex(group=>group.name===row.name)%groupColors.length]}}/><span>{row.name}<small>{row.count} stocks</small></span></button></th><td>{money(row.value)}</td><td>{pct(row.weight)}</td><td>{pct(row.target)}</td></tr>)}
-                <tr><th>Cash</th><td>{money(day.cash)}</td><td>{pct(day.cash/day.nav)}</td><td>{pct(1-(rebalance?.targets.reduce((a,b)=>a+b,0)??0))}</td></tr>
-              </tbody>
-            </table>
-          </div>
-          <details className="example-cost-settings"><summary>Transaction costs <span>{cost} bps</span></summary><div><label>Execution cost (bps)<input aria-label="Example execution cost" type="number" min="0" max="100" value={cost} onChange={e=>setCost(Math.min(100,Math.max(0,Number(e.target.value))))}/></label><p>Estimated total: <strong>{money(example.totalCosts)}</strong>. Portfolio performance is shown after these costs; sector return paths are gross.</p></div></details>
-        </section>
+        <PortfolioHoldings positions={positions} total={day.nav} history={{dates:example.days.map(day=>day.date),selectedDate:day.date,onSelectDate:setSelectedDate}} allocation={allocation} grouping={grouping} onGroupingChange={mode=>{setGrouping(mode);if(mode==="Sectors")setChartView("Returns by group");}} selectedGroup={selectedGroup} onSelectGroup={selectGroup} groupColors={Object.fromEntries(grouped.groups.map((group,i)=>[group.name,groupColors[i%groupColors.length]]))} onSelectTicker={onSelectTicker} footer={<details className="example-cost-settings"><summary>Transaction costs <span>{cost} bps</span></summary><div><label>Execution cost (bps)<input aria-label="Example execution cost" type="number" min="0" max="100" value={cost} onChange={e=>setCost(Math.min(100,Math.max(0,Number(e.target.value))))}/></label><p>Estimated total: <strong>{money(example.totalCosts)}</strong>. Portfolio performance is shown after these costs; sector return paths are gross.</p></div></details>}/>
       </aside>
     </div>
   </div>;

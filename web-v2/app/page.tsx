@@ -6,6 +6,8 @@ import { PublishedFundContext, PublishedFundHoldings } from "./published-fund";
 import PublishedDowPortfolio from "./published-dow";
 import ExamplePortfolio from "./example-portfolio";
 import StrategyWorkspace, { type StrategySettings, type StrategyWorkspaceProps } from "./strategy-workspace";
+import PortfolioComparisonWorkspace from "./portfolio-comparison";
+import FactorExposureChart from "./factor-exposure-chart";
 import { buildExamplePortfolio, exampleHoldingsSnapshot } from "@/lib/example-portfolio";
 import { publishedMarketNeutralFund } from "@/lib/published-fund";
 import { averagePairwiseCorrelation, buildAnalytics, buildCovarianceForecast, buildFactorModel, buildPortfolioDecomposition, buildRiskTargetSnapshot, buildRiskTargetStrategy, buildSecurityDrilldown, historicalReplay, pairwiseCorrelationAnalysis, rollingAveragePairwiseCorrelation, rollingPairwiseCorrelation, type CovarianceForecastAnalytics, type FactorAnalytics, type FactorModelAnalytics, type MarketPayload, type PairwiseCorrelationDetail, type PortfolioAnalytics, type RiskTargetSnapshot, type RollingCorrelationPoint, type SecurityDrilldownAnalytics, type StrategyBacktestAnalytics, type StrategyRebalanceFrequency } from "@/lib/analytics";
@@ -385,7 +387,6 @@ export default function Home() {
   const comparisonHoldings=isExample?(baselineHoldings.some(h=>h.ticker!=="CASH"&&h.value>0)?baselineHoldings:defaultExampleBaseline):baselineHoldings;
 
   const total = holdings.reduce((s, h) => s + h.value, 0);
-  const baselineTotal = comparisonHoldings.reduce((s, h) => s + h.value, 0);
   const invested = holdings.filter(h => h.ticker !== "CASH").reduce((s, h) => s + h.value, 0);
   const longExposure=holdings.filter(h=>h.ticker!=="CASH").reduce((sum,h)=>sum+Math.max(0,h.value),0);
   const shortExposure=holdings.filter(h=>h.ticker!=="CASH").reduce((sum,h)=>sum+Math.max(0,-h.value),0);
@@ -393,10 +394,8 @@ export default function Home() {
   const hasShort=shortExposure>.5;
   const analysisWindow = useMemo(() => ({ startDate: analysisStart || undefined, endDate: analysisEnd || undefined }), [analysisStart, analysisEnd]);
   const analytics = useMemo(() => marketData ? buildAnalytics(marketData, holdings, analysisWindow) : null, [marketData, holdings, analysisWindow]);
-  const baselineAnalytics = useMemo(() => marketData ? buildAnalytics(marketData, comparisonHoldings, analysisWindow) : null, [marketData, comparisonHoldings, analysisWindow]);
   const factorModel = useMemo(() => marketData && analytics ? buildFactorModel(marketData, analytics, total) : null, [marketData, analytics, total]);
   const portfolioDecomposition = useMemo(() => marketData && analytics ? buildPortfolioDecomposition(marketData, analytics) : null, [marketData, analytics]);
-  const baselineFactorModel = useMemo(() => marketData && baselineAnalytics ? buildFactorModel(marketData, baselineAnalytics, baselineTotal) : null, [marketData, baselineAnalytics, baselineTotal]);
   const deferredStrategyConfig=useDeferredValue(appliedStrategyConfig);
   const covarianceForecast=useMemo(()=>marketData&&!isPublishedFund&&(view==="Risk Analysis"&&riskTab==="Covariance Forecast"||view==="Strategy Analysis")?buildCovarianceForecast(marketData,holdings,analysisEnd||undefined):null,[marketData,holdings,analysisEnd,isPublishedFund,view,riskTab]);
   const riskTargetSnapshot=useMemo(()=>marketData&&covarianceForecast&&!hasShort&&!isPublishedFund?buildRiskTargetSnapshot(marketData,holdings,covarianceForecast,{targetVolatility:strategyTargetVolatility,targetBeta:strategyTargetBeta,maxPosition:strategyMaxPosition}):null,[marketData,holdings,covarianceForecast,hasShort,isPublishedFund,strategyTargetVolatility,strategyTargetBeta,strategyMaxPosition]);
@@ -490,7 +489,7 @@ export default function Home() {
   const availableEndDate = marketData?.asOf ?? marketData?.series.SPY?.points.at(-1)?.date ?? "";
   const viewCopy: Record<View, [string, string]> = {
     "Overview": ["See what is driving the portfolio", "Separate performance associated with market, style and sector factors from the idiosyncratic return that remains."],
-    "Compare": ["Portfolio comparison", "Compare the current portfolio with its saved baseline across allocation, risk, factors and historical performance."],
+    "Compare": ["Portfolio comparison", "Compare your current allocation with an editable alternative across weights, risk, factors and historical performance."],
     "Strategy Analysis": ["Portfolio construction", "Preview allocation changes, then inspect the historical strategy produced by your applied constraints."],
     "Risk Analysis": ["Risk analysis", "Understand factor exposure, position-level risk and changing correlations in one workspace."],
     "Security Analysis": ["Security analysis", "Select a holding to examine its return decomposition, factor loadings and relationship to the current portfolio."],
@@ -564,9 +563,9 @@ export default function Home() {
         {isPublishedFund && <PublishedFundContext />}
         {loading && !analytics && <DataLoading />}
         {!loading && !analytics && !dataError && <DataUnavailable />}
-        {!loading && analytics && (!factorModel || !baselineFactorModel) && ((view === "Risk Analysis"&&riskTab!=="Covariance Forecast") || view === "Performance" || view === "Compare") && <FactorModelUnavailable />}
+        {!loading && analytics && !factorModel && ((view === "Risk Analysis"&&riskTab!=="Covariance Forecast") || view === "Performance") && <FactorModelUnavailable />}
         {view === "Overview" && analytics && <Overview total={total} invested={invested} holdings={holdings} analytics={analytics} decomposition={portfolioDecomposition} onSelectTicker={setSelectedTicker} executionCostBps={executionCostBps} shortBorrowRate={shortBorrowRate} publishedFund={isPublishedFund} />}
-        {view === "Compare" && analytics && baselineAnalytics && factorModel && baselineFactorModel && <PortfolioComparison holdings={holdings} baselineHoldings={comparisonHoldings} total={total} baselineTotal={baselineTotal} analytics={analytics} baselineAnalytics={baselineAnalytics} model={factorModel} baselineModel={baselineFactorModel} onSaveBaseline={saveBaseline} />}
+        {view === "Compare" && analytics && marketData && <PortfolioComparisonWorkspace holdings={holdings} savedHoldings={comparisonHoldings} payload={marketData} reference={analytics} onSelectTicker={setSelectedTicker} renderPerformance={(current,alternative)=><PerformanceChart portfolio={current.curve} benchmark={alternative.curve} dates={current.dates} startDate={current.startDate} endDate={current.endDate} large primaryLabel="Current portfolio" secondaryLabel="Alternative portfolio" definition="Growth of $1 from the two starting allocations over identical trading dates. Shares are held fixed; cash earns 0%. This is a static historical replay, not the monthly portfolio’s actual holdings history."/>}/ >}
         {view === "Strategy Analysis" && marketData && (isPublishedFund?<section className="data-state"><div><strong>The fund’s allocation is managed by AQR</strong><p>Daily underlying weights are not available here. Strategy Lab sliders cannot change the fund’s historical trades. Choose the US Equity Portfolio to construct and inspect a dynamic allocation.</p></div></section>:hasShort?<section className="data-state"><div><strong>Dynamic Strategy is currently long-only</strong><p>Switch to the US Equity Portfolio demo or remove short positions. Portfolios with short positions can still be analyzed in Portfolio, Risk &amp; Attribution, Compare, Performance and Scenarios.</p></div></section>:<StrategyAnalysis strategy={strategyAnalytics} snapshot={riskTargetSnapshot} isUpdating={strategyBacktestUpdating} total={total} frequency={strategyFrequency} setFrequency={setStrategyFrequency} targetVolatility={strategyTargetVolatility} setTargetVolatility={setStrategyTargetVolatility} targetBeta={strategyTargetBeta} setTargetBeta={setStrategyTargetBeta} maxPosition={strategyMaxPosition} setMaxPosition={setStrategyMaxPosition} applied={deferredStrategyConfig} hasPendingChanges={strategyHasPendingChanges} onRunBacktest={()=>setAppliedStrategyConfig({frequency:strategyFrequency,targetVolatility:strategyTargetVolatility,targetBeta:strategyTargetBeta,maxPosition:strategyMaxPosition})} onResetDraft={()=>{setStrategyFrequency(appliedStrategyConfig.frequency);setStrategyTargetVolatility(appliedStrategyConfig.targetVolatility);setStrategyTargetBeta(appliedStrategyConfig.targetBeta);setStrategyMaxPosition(appliedStrategyConfig.maxPosition)}} onSelectTicker={setSelectedTicker} payload={marketData} startDate={analytics?.startDate??analysisStart} endDate={analytics?.endDate??analysisEnd} />)}
         {view === "Security Analysis" && analytics && <SecurityAnalysisWorkspace holdings={holdings} selectedTicker={selectedTicker} onSelectTicker={setSelectedTicker} security={securityAnalytics} portfolio={analytics} total={total} />}
         {view === "Risk Analysis" && analytics && marketData && !(isPublishedFund&&(riskTab==="Covariance Forecast"||riskTab==="Correlations")) && <RiskWorkspace tab={riskTab} model={factorModel} total={total} holdings={holdings} analytics={analytics} payload={marketData} forecast={covarianceForecast} onSelectTicker={setSelectedTicker} />}
@@ -583,61 +582,6 @@ export default function Home() {
   );
 }
 
-function PortfolioComparison({ holdings, baselineHoldings, total, baselineTotal, analytics, baselineAnalytics, model, baselineModel, onSaveBaseline }: { holdings: Holding[]; baselineHoldings: Holding[]; total: number; baselineTotal: number; analytics: PortfolioAnalytics; baselineAnalytics: PortfolioAnalytics; model: FactorModelAnalytics; baselineModel: FactorModelAnalytics; onSaveBaseline: () => void }) {
-  const currentByTicker = new Map(holdings.map((holding) => [holding.ticker, holding]));
-  const baselineByTicker = new Map(baselineHoldings.map((holding) => [holding.ticker, holding]));
-  const tickers = [...new Set([...baselineHoldings.map((holding) => holding.ticker), ...holdings.map((holding) => holding.ticker)])];
-  const allocationRows = tickers.map((ticker) => {
-    const current = currentByTicker.get(ticker);
-    const baseline = baselineByTicker.get(ticker);
-    const currentValue = current?.value ?? 0;
-    const baselineValue = baseline?.value ?? 0;
-    return { ticker, name: current?.name ?? baseline?.name ?? ticker, currentValue, baselineValue, valueDelta: currentValue - baselineValue, currentWeight: currentValue / Math.max(total, 1), baselineWeight: baselineValue / Math.max(baselineTotal, 1) };
-  }).sort((a, b) => Math.abs(b.currentWeight - b.baselineWeight) - Math.abs(a.currentWeight - a.baselineWeight));
-  const changedPositions = allocationRows.filter((row) => Math.abs(row.valueDelta) >= .5 || Math.abs(row.currentWeight - row.baselineWeight) >= .00005).length;
-
-  const baselineDates = new Map(baselineAnalytics.dates.map((date, index) => [date, baselineAnalytics.curve[index]]));
-  const currentDates = new Map(analytics.dates.map((date, index) => [date, analytics.curve[index]]));
-  const commonDates = analytics.dates.filter((date) => baselineDates.has(date));
-  const currentRaw = commonDates.map((date) => currentDates.get(date)!);
-  const baselineRaw = commonDates.map((date) => baselineDates.get(date)!);
-  const currentStart = currentRaw[0] || 1;
-  const baselineStart = baselineRaw[0] || 1;
-  const currentCurve = currentRaw.map((value) => value / currentStart);
-  const baselineCurve = baselineRaw.map((value) => value / baselineStart);
-
-  const baselineFactors = new Map(baselineModel.factors.map((factor) => [factor.name, factor]));
-  const factorRows = model.factors.map((factor) => ({ ...factor, baselineExposure: baselineFactors.get(factor.name)?.exposure ?? 0, delta: factor.exposure - (baselineFactors.get(factor.name)?.exposure ?? 0) }));
-  const largestFactorMove = Math.max(...factorRows.map((factor) => Math.abs(factor.delta)), .01);
-  const hasFactorChanges=factorRows.some(factor=>Math.abs(factor.delta)>=.005);
-
-  return <section className="comparison-layout">
-    <article className="panel comparison-status">
-      <div><span className="kicker">SAVED BASELINE</span><h2>{changedPositions ? `${changedPositions} changed position${changedPositions === 1 ? "" : "s"}` : "Current portfolio matches baseline"}</h2><p>The baseline remains fixed while you edit dollar values or weights. Save the current portfolio when you want to move the reference point.</p></div>
-      <button onClick={onSaveBaseline}>Save current as baseline</button>
-    </article>
-    <section className="metrics comparison-metrics">
-      <Metric label="PORTFOLIO VALUE" value={money(total)} sub={`Baseline ${money(baselineTotal)} · Δ ${signedMoney(total-baselineTotal)}`} />
-      <Metric label="ANNUALIZED VOLATILITY" value={pct(analytics.annualVolatility*100)} sub={`Baseline ${pct(baselineAnalytics.annualVolatility*100)} · Δ ${pct((analytics.annualVolatility-baselineAnalytics.annualVolatility)*100)}`} tone="amber" />
-      <Metric label="MARKET BETA" value={analytics.beta.toFixed(2)} sub={`Baseline ${baselineAnalytics.beta.toFixed(2)} · Δ ${(analytics.beta-baselineAnalytics.beta)>=0?"+":""}${(analytics.beta-baselineAnalytics.beta).toFixed(2)}`} />
-      <Metric label="MAX DRAWDOWN" value={pct(analytics.maxDrawdown*100)} sub={`Baseline ${pct(baselineAnalytics.maxDrawdown*100)} · Δ ${pct((analytics.maxDrawdown-baselineAnalytics.maxDrawdown)*100)}`} tone="red" />
-      <Metric label="MODEL R²" value={`${(model.rSquared*100).toFixed(0)}%`} sub={`Baseline ${(baselineModel.rSquared*100).toFixed(0)}% · Δ ${pct((model.rSquared-baselineModel.rSquared)*100)}`} />
-    </section>
-    <article className="panel comparison-performance">
-      <PanelTitle title="Historical performance comparison" meta="Current portfolio vs. saved baseline" />
-      {commonDates.length > 1 && <PerformanceChart portfolio={currentCurve} benchmark={baselineCurve} dates={commonDates} startDate={commonDates[0]} endDate={commonDates.at(-1)!} large primaryLabel="Current portfolio" secondaryLabel="Saved baseline" definition="Growth of $1 over common trading dates. Both portfolios use buy-and-hold current-dollar allocations; cash earns 0%. This is a historical replay, not a forecast." />}
-    </article>
-    <article className="panel comparison-positions">
-      <PanelTitle title="Allocation changes" meta="Whole portfolio · baseline to current" />
-      <div className="comparison-head"><span>POSITION</span><span>BASELINE</span><span>CURRENT</span><span>Δ VALUE</span><span>Δ WEIGHT</span></div>
-      {allocationRows.map((row) => <div className="comparison-row" key={row.ticker}><div><strong>{row.ticker}</strong><small>{row.name}</small></div><span>{money(row.baselineValue)}<small>{(row.baselineWeight*100).toFixed(1)}%</small></span><span>{money(row.currentValue)}<small>{(row.currentWeight*100).toFixed(1)}%</small></span><strong className={row.valueDelta>0?"delta-positive":row.valueDelta<0?"delta-negative":""}>{signedMoney(row.valueDelta)}</strong><strong className={row.currentWeight>row.baselineWeight?"delta-positive":row.currentWeight<row.baselineWeight?"delta-negative":""}>{pct((row.currentWeight-row.baselineWeight)*100)}</strong></div>)}
-    </article>
-    <article className="panel comparison-factors">
-      <PanelTitle title="Factor exposure changes" meta="Regression sensitivity · baseline to current" />
-      {hasFactorChanges?<><div className="comparison-factor-head"><span>FACTOR</span><span>BASELINE</span><span>CURRENT</span><span>CHANGE</span></div>{factorRows.map((factor) => <div className="comparison-factor-row" key={factor.name}><div><strong>{factor.name}</strong><small>{factor.group}</small></div><span>{factor.baselineExposure>=0?"+":""}{factor.baselineExposure.toFixed(2)}</span><span>{factor.exposure>=0?"+":""}{factor.exposure.toFixed(2)}</span><div className="factor-change"><i className={factor.delta<0?"negative":""} style={{width:`${Math.abs(factor.delta)/largestFactorMove*48}%`}}/><strong className={factor.delta>0?"delta-positive":factor.delta<0?"delta-negative":""}>{factor.delta>=0?"+":""}{factor.delta.toFixed(2)}</strong></div></div>)}</>:<div className="comparison-empty"><strong>No factor changes from baseline</strong><p>Edit one or more positions, then return here to see how the portfolio’s modeled exposures changed.</p></div>}
-    </article>
-  </section>;
-}
 
 function Overview({ total, invested, holdings, analytics, decomposition, onSelectTicker, executionCostBps, shortBorrowRate, publishedFund = false }: { total: number; invested: number; holdings: Holding[]; analytics: PortfolioAnalytics; decomposition: SecurityDrilldownAnalytics["decomposition"] | null; onSelectTicker: (ticker: string) => void; executionCostBps:number; shortBorrowRate:number; publishedFund?:boolean }) {
   const positionNames = new Map(holdings.map((holding) => [holding.ticker, holding]));
@@ -762,6 +706,7 @@ function FactorRisk({ model, total }: { model: FactorModelAnalytics; total: numb
   const visible=group==="All"?model.factors:model.factors.filter(factor=>factor.group===group);
   const idiosyncraticShare=1-model.rSquared;
   return <>
+    <FactorExposureChart factors={model.factors} />
     <section className="metrics factor-summary">
       <Metric label="EXPLAINED DAILY VARIANCE" value={`${(model.rSquared*100).toFixed(0)}%`} sub="Core-first FWL residualization" tone="cyan" />
       <Metric label="IDIOSYNCRATIC VARIANCE" value={`${(idiosyncraticShare*100).toFixed(0)}%`} sub="Unexplained daily-return variance" />
@@ -771,7 +716,6 @@ function FactorRisk({ model, total }: { model: FactorModelAnalytics; total: numb
     </section>
     <section className="factor-layout refined-factor-layout">
       <article className="panel factor-table"><PanelTitle title="Factor drill down" meta="Core → market-neutral style → core/style-neutral sector" /><div className="factor-tabs">{(["All","Style","Sector"] as const).map(item=><button key={item} onClick={()=>setGroup(item)} className={group===item?"on":""}>{item}</button>)}</div><div className="factor-head"><span>FACTOR</span><span>CONDITIONAL EXPOSURE</span><span>SHARE OF RISK</span><span>ANNUAL RISK</span><span>LINKED P&amp;L</span></div>{visible.map(factor => <div className="factor-row" key={factor.name}><strong>{factor.name}</strong><div className={`heat ${factor.exposure < 0 ? "neg" : "pos"}`}>{factor.exposure > 0 ? "+" : ""}{factor.exposure.toFixed(2)}</div><span>{(factor.riskShare*100).toFixed(1)}%</span><b>{money(factor.annualRisk)}</b><em className={factor.returnAttribution < 0 ? "down" : "up"}>{money(factor.returnAttribution)}</em></div>)}</article>
-      <article className="panel factor-bars"><PanelTitle title="Portfolio factor exposure" meta="Conditional regression sensitivity" />{visible.map(factor => <div className="hbar" key={factor.name}><span>{factor.name}</span><div><i className={factor.exposure < 0 ? "left" : "right"} style={{ width: `${Math.min(48,Math.abs(factor.exposure) * 35)}%` }} /></div><b>{factor.exposure > 0 ? "+" : ""}{factor.exposure.toFixed(2)}</b></div>)}</article>
       <article className="panel model-layers"><PanelTitle title="Risk and return by model layer" meta="Incremental explanation" />{model.layers.map(layer=><div className="layer-row" key={layer.name}><strong>{layer.name}</strong><div><span>RISK</span><i><b style={{width:`${Math.max(0,Math.min(100,layer.riskShare*100))}%`}}/></i><em>{(layer.riskShare*100).toFixed(1)}%</em></div><div><span>RETURN</span><em className={layer.returnAttribution<0?"down":"up"}>{money(layer.returnAttribution)}</em></div></div>)}</article>
       <article className="panel factor-diagnostics"><PanelTitle title="Factor overlap diagnostics" meta="Raw ETF-proxy returns before residualization" /><p>{model.diagnostics.specification}</p><div className="diagnostic-head"><span>PAIR</span><span>GROUP</span><span>CORRELATION</span></div>{model.diagnostics.correlations.map(pair=><div className="diagnostic-row" key={`${pair.factorA}-${pair.factorB}`}><strong>{pair.factorA}<i>×</i>{pair.factorB}</strong><span>{pair.groups}</span><b className={Math.abs(pair.correlation)>=.7?"warning":""}>{pair.correlation.toFixed(2)}</b></div>)}<small>High correlation does not invalidate the total fitted return, but it makes individual within-block attribution more model-dependent. Factor rows are conditional estimates, not independent causal effects.</small></article>
     </section>

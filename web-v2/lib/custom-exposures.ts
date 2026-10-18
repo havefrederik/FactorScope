@@ -1,0 +1,14 @@
+import { csvRows } from "./holdings-input.ts";
+export type CustomExposure={name:string;group:"Custom";values:number[];asOf:string;unit:string};
+export function validateCustomExposureSnapshot(value:unknown,tickers:string[],cutoff:string):CustomExposure[]{
+ if(!Array.isArray(value)||value.length>50)throw Error("Invalid saved custom exposures.");
+ const names=new Set<string>();return value.map(item=>{if(!item||typeof item.name!=="string"||!item.name.startsWith("Custom: ")||names.has(item.name)||typeof item.unit!=="string"||!item.unit||typeof item.asOf!=="string"||!/^\d{4}-\d{2}-\d{2}$/.test(item.asOf)||!Number.isFinite(Date.parse(item.asOf))||new Date(item.asOf).toISOString().slice(0,10)!==item.asOf||item.asOf>cutoff||!Array.isArray(item.values)||item.values.length!==tickers.length||!item.values.every((v:unknown)=>typeof v==="number"&&Number.isFinite(v)))throw Error("Invalid or future-dated saved custom exposures.");names.add(item.name);return {name:item.name,group:"Custom",unit:item.unit,asOf:item.asOf,values:item.values.slice()};});
+}
+export function parseCustomExposures(text:string,tickers:string[],cutoff:string):CustomExposure[]{
+ const rows=csvRows(text.replace(/^\uFEFF/,"")),header=(rows.shift()??[]).map(v=>v.trim().toLowerCase()),indices=["ticker","factor","exposure","as_of","unit"].map(key=>header.indexOf(key));
+ if(indices.some(i=>i<0))throw Error("Exposure CSV requires ticker,factor,exposure,as_of,unit columns.");
+ const groups=new Map<string,{asOf:string;unit:string;values:Map<string,number>}>();
+ for(const [i,row] of rows.entries()){const [tickerRaw,name,raw,asOf,unit]=indices.map(j=>(row[j]??"").trim()),ticker=tickerRaw.toUpperCase(),value=Number(raw);if(!tickers.includes(ticker))throw Error(`Row ${i+2}: ${ticker} is not in the eligible universe.`);if(!name||name.length>80||!raw||!Number.isFinite(value)||!unit)throw Error(`Invalid exposure or label on row ${i+2}.`);if(!/^\d{4}-\d{2}-\d{2}$/.test(asOf)||!Number.isFinite(Date.parse(asOf))||new Date(asOf).toISOString().slice(0,10)!==asOf||asOf>cutoff)throw Error(`Row ${i+2}: exposure dates must be valid and no later than ${cutoff}.`);const group=groups.get(name)??{asOf,unit,values:new Map<string,number>()};if(group.asOf!==asOf||group.unit!==unit)throw Error(`All ${name} exposures must share one date and unit.`);if(group.values.has(ticker))throw Error(`Duplicate ${name} exposure for ${ticker}.`);group.values.set(ticker,value);groups.set(name,group);}
+ if(!groups.size||groups.size>50)throw Error("Supply between 1 and 50 factors.");
+ return [...groups].map(([name,group])=>{const missing=tickers.filter(t=>!group.values.has(t));if(missing.length)throw Error(`${name}: missing exposures for ${missing.join(", ")}.`);return {name:`Custom: ${name}`,group:"Custom",asOf:group.asOf,unit:group.unit,values:tickers.map(t=>group.values.get(t)!)};});
+}

@@ -93,7 +93,7 @@ test("cash dilution reduces absolute forecast risk without inventing a change in
 test("factor and idiosyncratic attribution effects reconcile to the portfolio P&L difference", () => {
   const dates = [];
   for (let day = new Date("2025-01-01T00:00:00Z"); dates.length < 160; day.setUTCDate(day.getUTCDate() + 1)) if (day.getUTCDay() % 6) dates.push(day.toISOString().slice(0, 10));
-  const tickers = ["AAA", "BBB", "SPY", "IWM", "IWD", "IWF", "MTUM", "QUAL", "USMV", "VYM", "XLK", "XLF", "XLE", "XLV", "XLC", "XLY", "XLP", "XLI", "XLB", "XLRE", "XLU"];
+  const tickers = ["AAA", "BBB", "SPY", "IWM", "IWD", "IWF", "MTUM", "QUAL", "USMV", "VYM", "IJH", "COWZ", "XLK", "XLF", "XLE", "XLV", "XLC", "XLY", "XLP", "XLI", "XLB", "XLRE", "XLU"];
   const series = Object.fromEntries(tickers.map((ticker, asset) => { let close = 100; return [ticker, { points: dates.map((date, index) => { close *= 1 + .0001 + .005 * Math.sin(index * .4) + .002 * Math.sin(index * (.12 + asset * .047)); return { date, close }; }) }]; }));
   const payload = { series, asOf: dates.at(-1) }, window = { startDate: dates[0], endDate: dates.at(-1) };
   const holdings = [{ ticker: "AAA", value: 700000 }, { ticker: "BBB", value: 300000 }, { ticker: "CASH", value: 0 }];

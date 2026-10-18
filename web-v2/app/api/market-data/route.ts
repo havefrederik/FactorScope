@@ -4,7 +4,7 @@ import { normalizeYahooSymbol, validateMarketTickers } from "../../../lib/market
 const yahooFinance = new YahooFinance();
 const cache = new Map<string, { expires: number; value: SymbolSeries }>();
 const FACTOR_SYMBOLS = [
-  "SPY", "IWM", "IWD", "IWF", "MTUM", "QUAL", "USMV", "VYM",
+  "SPY", "IWM", "IWD", "IWF", "MTUM", "QUAL", "USMV", "VYM", "IJH", "COWZ",
   "XLK", "XLF", "XLE", "XLV", "XLC", "XLY", "XLP", "XLI", "XLB", "XLRE", "XLU",
 ];
 

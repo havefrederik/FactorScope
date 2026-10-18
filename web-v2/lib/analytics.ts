@@ -198,6 +198,8 @@ const factorDefs: { name: string; group: FactorAnalytics["group"]; long: string;
   { name: "Quality", group: "Style", long: "QUAL", short: "SPY" },
   { name: "Low volatility", group: "Style", long: "USMV", short: "SPY" },
   { name: "Dividend yield", group: "Style", long: "VYM", short: "SPY" },
+  { name: "Mid-cap", group: "Style", long: "IJH", short: "SPY" },
+  { name: "Free cash flow yield", group: "Style", long: "COWZ", short: "SPY" },
   { name: "Technology", group: "Sector", long: "XLK", short: "SPY" },
   { name: "Financials", group: "Sector", long: "XLF", short: "SPY" },
   { name: "Energy", group: "Sector", long: "XLE", short: "SPY" },
@@ -566,9 +568,9 @@ export function forecastCombinedIewmaCovariance(assetReturns: number[][], lastOb
   return forecastFromIewmaExperts(assetReturns, buildIewmaExpertSnapshots(assetReturns), lastObservedPeriod);
 }
 
-export function buildCovarianceForecast(payload: MarketPayload, holdings: AnalyticsHolding[], asOf?: string): CovarianceForecastAnalytics | null {
+export function buildCovarianceForecast(payload: MarketPayload, holdings: AnalyticsHolding[], asOf?: string, includeCandidates=false): CovarianceForecastAnalytics | null {
   const total = holdings.reduce((sum, holding) => sum + holding.value, 0);
-  const active = holdings.filter((holding) => holding.ticker !== "CASH" && holding.value !== 0 && payload.series[holding.ticker]);
+  const active = holdings.filter((holding) => holding.ticker !== "CASH" && (includeCandidates||holding.value !== 0) && payload.series[holding.ticker]);
   if (!active.length || total <= 0) return null;
   const cutoff = asOf || payload.asOf || payload.series[active[0].ticker]?.points.at(-1)?.date || "";
   const priceMaps = active.map((holding) => new Map(payload.series[holding.ticker].points.filter((point) => point.date <= cutoff).map((point) => [point.date, point.close])));

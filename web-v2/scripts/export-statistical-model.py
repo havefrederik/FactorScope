@@ -1,5 +1,5 @@
 """Export a local FactorScope snapshot from the separately supplied research package.
-No research inputs or generated snapshots belong in the public source repository.
+Raw research inputs stay local. Only derived model summaries are suitable for the website.
 Run: python scripts/export-statistical-model.py --research-dir /path/to/package --output /path/outside/repo/model.json
 """
 import os
@@ -45,7 +45,7 @@ def main():
       ix,raw,don=rv.data_at(date,'REIT')
       for variant in ('ONE_YEAR_EQUAL','REFERENCE'):
         f,_,_,_=rv.extract(raw[:,don],variant); H=separate_cov(f,len(f),len(f),60,125,1)
-        inds=[i for _,i in selected]; y=raw[:,inds]; B,a,d,counts=load_fit(f,y,'EQUAL250')
+        inds=[i for _,i in selected]; y=raw[:,inds]; B,a,d,counts=load_fit(f,y,'EW63')
         stocks=[]
         for j,(ticker,i) in enumerate(selected):
           valid=np.isfinite(B[j]).all() and np.isfinite(d[j]) and np.isfinite(y[-250:,j]).all()
@@ -62,27 +62,40 @@ def main():
             if not isinstance(symbol,str) or not symbol: symbol=str(row.permno)
             pairs.append(dict(ticker=symbol,correlation=float(cs[q,k])))
           profiles.append(dict(negative=pairs[:5],positive=pairs[5:]))
-        snap=dict(asOf=date,variant=variant,population='REIT-inclusive',donorCount=len(don),loading='EQUAL250',dates=data['dates'][ix[-250:]].astype(str).tolist(),factorReturns=f[-250:],covariance=H,stocks=stocks,profiles=profiles)
+        snap=dict(asOf=date,variant=variant,population='REIT-inclusive',donorCount=len(don),loading='EW63',dates=data['dates'][ix[-250:]].astype(str).tolist(),factorReturns=f[-250:],covariance=H,stocks=stocks,profiles=profiles)
+        # Publish sufficient statistics, never daily security or factor return histories.
+        observations=np.array([stock.pop('returns') for stock in stocks]).T
+        moments=np.cov(np.column_stack([observations,f[-250:]]),rowvar=False)
+        n=len(stocks)
+        snap.pop('factorReturns')
+        snap['observedCovariance']=moments[:n,:n]
+        snap['stockFactorCovariance']=moments[:n,n:]
+        snap['factorVariances']=np.diag(moments)[n:]
         snapshots.append(snap)
         # Independently compare the same AI basket against the supplied saved checkpoint.
-        saved=root/f'results/checkpoints/REIT_{date}_{variant}_EQUAL250.npz'
+        saved=root/f'results/checkpoints/REIT_{date}_{variant}_EW63.npz'
         if saved.exists():
           cp=np.load(saved,allow_pickle=False)
           err=float(np.max(np.abs(H-cp['H'])))
-          checks.append(dict(date=date,variant=variant,covarianceMaxError=err))
+          names=cp['names'].tolist()
+          pairs=[(j,names.index(t)) for j,(t,_) in enumerate(selected) if t in names and np.isfinite(B[j]).all()]
+          be=max(float(np.max(np.abs(B[j]-cp['B'][k]))) for j,k in pairs)
+          de=max(float(abs(d[j]-cp['d'][k])) for j,k in pairs)
+          if be>1e-8 or de>1e-8: raise ValueError('EW63 loading replay failed')
+          checks.append(dict(date=date,variant=variant,covarianceMaxError=err,loadingMaxError=be,specificMaxError=de))
           if err>1e-8:raise ValueError('Research covariance replay failed')
         print(date,variant,len(stocks),'receivers',len(don),'donors',flush=True)
     metrics=pd.read_csv(root/'results/metrics.csv');corr=pd.read_csv(root/'results/correlations.csv')
     histories=[]
     for variant in ('ONE_YEAR_EQUAL','REFERENCE'):
-      for basket in ('AI35','AI32'):
-        rows=metrics[(metrics.model=='REIT')&(metrics.variant==variant)&(metrics.loading=='EQUAL250')&(metrics.basket==basket)&metrics.coverage_ok]
+      for basket in ('AVAILABLE_NOT_AI35','AI35','AI32'):
+        rows=metrics[(metrics.model=='REIT')&(metrics.variant==variant)&(metrics.loading=='EW63')&(metrics.basket==basket)&metrics.coverage_ok]
         cs=corr[(corr.model=='REIT')&(corr.variant==variant)&(corr.basket==basket)].pivot(index='date',columns='factor',values='abs_correlation')
         points=[]
         for r in rows.sort_values('date').itertuples():
-          if r.date in cs.index:points.append(dict(date=r.date,correlations=cs.loc[r.date].tolist(),risk=[r.f1_bps,r.f2_bps,r.other_bps,r.specific_bps],volatility=r.volatility))
-        histories.append(dict(variant=variant,basket=basket,points=points))
-    result=dict(schemaVersion=1,title='Statistical replication research',source='CRSP history + audited Yahoo extension',dataThrough=str(data['dates'][-1]),sourceHash=hashlib.sha256((root/'inputs/extended_hybrid_panel.npz').read_bytes()).hexdigest(),universeNote='Research eligibility is anchored to the archived universe; this is not a survivorship-free historical universe.',aiBasket=list(amap),snapshots=snapshots,histories=histories,exportChecks=checks,unmappedTickers=missing)
+          if r.date in cs.index:points.append(dict(date=r.date,nHoldings=int(r.n_holdings),correlations=cs.loc[r.date].tolist(),risk=[r.f1_bps,r.f2_bps,r.other_bps,r.specific_bps],volatility=r.volatility))
+        histories.append(dict(variant=variant,loading='EW63',basket=basket,points=points))
+    result=dict(schemaVersion=2,title='Statistical replication research',source='CRSP history + audited Yahoo extension',dataThrough=str(data['dates'][-1]),sourceHash=hashlib.sha256((root/'inputs/extended_hybrid_panel.npz').read_bytes()).hexdigest(),universeNote='Research eligibility is anchored to the archived universe; this is not a survivorship-free historical universe.',aiBasket=list(amap),snapshots=snapshots,histories=histories,exportChecks=checks,unmappedTickers=missing)
     args.output.parent.mkdir(parents=True,exist_ok=True)
     args.output.write_text(json.dumps(clean(result),separators=(',',':'),allow_nan=False))
     print('Exported',args.output,'bytes',args.output.stat().st_size,'unmapped',missing)

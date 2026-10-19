@@ -2,6 +2,7 @@
 
 import { ChangeEvent, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import StatisticalModel from "./statistical-model";
+import {aiPortfolioSeed, AI_PORTFOLIO_DATE} from "@/lib/ai-portfolio";
 import CovarianceForecastView from "./covariance-forecast";
 import { PublishedFundContext, PublishedFundHoldings } from "./published-fund";
 import PublishedDowPortfolio from "./published-dow";
@@ -19,7 +20,7 @@ import { averagePairwiseCorrelation, buildAnalytics, buildCovarianceForecast, bu
 
 type Holding = { ticker: string; name: string; sector: string; value: number; beta: number; vol: number; risk: number };
 type View = "Overview" | "Compare" | "Optimizer" | "Strategy Analysis" | "Risk Analysis" | "Security Analysis" | "Performance" | "Scenario Lab" | "Methodology" | "Project Brief";
-type DemoKey = "equity" | "published-market-neutral" | "published-dow" | "example";
+type DemoKey = "ai" | "equity" | "published-market-neutral" | "published-dow" | "example";
 
 const equitySeed: Holding[] = [
   { ticker: "AAPL", name: "Apple", sector: "Technology", value: 40000, beta: 1.14, vol: 24.8, risk: 4.0 },
@@ -385,7 +386,8 @@ export default function Home() {
   const isPublishedFund=portfolioSource==="demo"&&demoKey==="published-market-neutral";
   const isArchivedPortfolio=portfolioSource==="demo"&&demoKey==="published-dow";
   const isExample=portfolioSource==="demo"&&demoKey==="example";
-  const isReadOnlyPortfolio=isArchivedPortfolio||isExample;
+  const isAI=portfolioSource==="demo"&&demoKey==="ai";
+  const isReadOnlyPortfolio=isArchivedPortfolio||isExample||isAI;
   const defaultExampleMonth=marketData?.asOf?`${Number(marketData.asOf.slice(0,4))-3}-${marketData.asOf.slice(5,7)}`:"";
   const exampleMonth=exampleFirstMonth||defaultExampleMonth;
   const exampleData=useMemo(()=>marketData&&isExample&&exampleMonth?buildExamplePortfolio(marketData,exampleUniverse,`${exampleMonth}-01`,marketData.asOf??"",executionCostBps):null,[marketData,isExample,exampleMonth,executionCostBps]);
@@ -485,7 +487,8 @@ export default function Home() {
   function remove(ticker: string) { if(ticker==="CASH")return;setHoldings(items=>{const removed=items.find(item=>item.ticker===ticker)?.value??0;const remaining=items.filter(item=>item.ticker!==ticker);return remaining.some(item=>item.ticker==="CASH")?remaining.map(item=>item.ticker==="CASH"?{...item,value:item.value+removed}:item):[...remaining,{ticker:"CASH",name:"Cash (residual)",sector:"Cash",value:removed,beta:0,vol:0,risk:0}]}); }
   function addSecurity(rawTicker:string) {const ticker=rawTicker.trim().toUpperCase();if(!/^[A-Z][A-Z0-9.-]{0,9}$/.test(ticker)){setPortfolioError("Enter a valid US ticker symbol.");return}if(holdings.some(item=>item.ticker===ticker)){setPortfolioError(`${ticker} is already in the portfolio.`);return}const match=stockCatalog.find(item=>item[0]===ticker);const added:Holding={ticker,name:match?.[1]??ticker,sector:match?.[2]??"Unclassified",value:0,beta:1,vol:25,risk:2};setHoldings(items=>[...items.filter(item=>item.ticker!=="CASH"),added,...items.filter(item=>item.ticker==="CASH")]);setAddingSecurity(false);setSecuritySearch("");setPortfolioError(null)}
   function saveBaseline(){setBaselineHoldings(holdings.map(item=>({...item})));}
-  function loadDemo(key:DemoKey){const next=key==="published-market-neutral"?publishedMarketNeutralSeed:key==="published-dow"?publishedDowSeed:key==="example"?exampleSeed:equitySeed;setDemoKey(key);setHoldings(next.map(item=>({...item})));setBaselineHoldings(next.map(item=>({...item})));setPortfolioSource("demo");setPortfolioName(key==="published-market-neutral"?"AQR Equity Market Neutral":key==="published-dow"?"Published Dow Strategy":key==="example"?"US Equity Portfolio":"US Equity Portfolio");setPortfolioError(null);setSelectedTicker(null);setEditing(false);setView("Overview")}
+  function loadDemo(key:DemoKey){const url=new URL(window.location.href);if(key==="ai")url.searchParams.set("portfolio","ai");else url.searchParams.delete("portfolio");window.history.replaceState(null,"",url);const next=key==="ai"?aiPortfolioSeed:key==="published-market-neutral"?publishedMarketNeutralSeed:key==="published-dow"?publishedDowSeed:key==="example"?exampleSeed:equitySeed;setDemoKey(key);setHoldings(next.map(item=>({...item})));setBaselineHoldings(next.map(item=>({...item})));setPortfolioSource("demo");setPortfolioName(key==="ai"?"AI Theme Portfolio":key==="published-market-neutral"?"AQR Equity Market Neutral":key==="published-dow"?"Published Dow Strategy":key==="example"?"US Equity Portfolio":"US Equity Portfolio");setPortfolioError(null);setSelectedTicker(null);setEditing(false);setView(key==="ai"?"Risk Analysis":"Overview");if(key==="ai")setRiskTab("Statistical Model")}
+  useEffect(()=>{if(new URLSearchParams(window.location.search).get("portfolio")==="ai")loadDemo("ai")},[]);
   function resetDemo(){loadDemo(demoKey)}
   function upload(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]; if (!file) return;
@@ -516,7 +519,7 @@ export default function Home() {
   const aboutTab = view === "Project Brief" ? "Project Brief" : "Methodology";
   const isStatisticalView=view==="Risk Analysis"&&riskTab==="Statistical Model";
   const isCovarianceView=view==="Risk Analysis"&&riskTab==="Covariance Forecast";
-  const displayedViewCopy:[string,string]=isStatisticalView?["Statistical factor research","Explore common risk across stocks and the AI theme portfolio."]:isCovarianceView?["Covariance forecast","Inspect the next-session CM-IEWMA covariance forecast used by portfolio risk and Strategy Lab."]:viewCopy[view];
+  const displayedViewCopy:[string,string]=isStatisticalView?["Statistical factor exposure","Understand your portfolio’s statistical factor relationships and sources of risk."]:isCovarianceView?["Covariance forecast","Inspect the next-session CM-IEWMA covariance forecast used by portfolio risk and Strategy Lab."]:viewCopy[view];
 
   const exampleWorkspace=loading?<DataLoading/>:marketData&&exampleData&&exampleSnapshot?<ExamplePortfolio sectors={exampleSectors} payload={marketData} example={exampleData} firstMonth={exampleMonth} setFirstMonth={month=>{setExampleFirstMonth(month);setAnalysisStart(`${month}-01`);setAnalysisEnd(marketData.asOf??"")}} cost={executionCostBps} setCost={setExecutionCostBps} selectedDate={exampleSnapshot.date} setSelectedDate={setAnalysisEnd} onSelectTicker={setSelectedTicker} renderPerformance={a=><PerformanceChart portfolio={a.curve} benchmark={a.benchmarkCurve} dates={a.dates} startDate={a.startDate} endDate={a.endDate} large primaryLabel="US Equity Portfolio" definition="Growth of $1 from monthly selections, with drifting holdings and execution costs."/>} renderDecomposition={d=><DecompositionChart decomposition={d}/>}/>:<section className="data-state"><div><strong>{dataError?"Portfolio data unavailable":"No complete months in this range"}</strong><p>{dataError??"Choose the default period to restore monthly holdings."}</p><button onClick={()=>{setExampleFirstMonth("");setAnalysisEnd(marketData?.asOf??"");if(dataError)void loadMarketData();}}>Restore portfolio</button></div></section>;
 
@@ -526,7 +529,7 @@ export default function Home() {
         <div className="brand"><span className="brandmark">F</span><span>FactorScope</span></div>
         <nav className="primary-navigation" aria-label="Primary navigation">
           <button onClick={()=>setView("Overview")} aria-current={primarySection==="Portfolio"?"page":undefined} className={primarySection==="Portfolio"?"active":""}>Portfolio</button>
-          <button disabled={isArchivedPortfolio} onClick={()=>{setView("Risk Analysis");setRiskTab("Factors")}} aria-current={primarySection==="Risk & Attribution"?"page":undefined} className={primarySection==="Risk & Attribution"?"active":""}>Risk &amp; Attribution</button>
+          <button disabled={isArchivedPortfolio} onClick={()=>{setView("Risk Analysis");setRiskTab(isAI?"Statistical Model":"Factors")}} aria-current={primarySection==="Risk & Attribution"?"page":undefined} className={primarySection==="Risk & Attribution"?"active":""}>Risk &amp; Attribution</button>
           <button disabled={isArchivedPortfolio} onClick={()=>setView("Compare")} aria-current={primarySection==="Strategy Lab"?"page":undefined} className={primarySection==="Strategy Lab"?"active":""}>Strategy Lab</button>
           <button onClick={()=>setView("Methodology")} aria-current={primarySection==="About"?"page":undefined} className={primarySection==="About"?"active":""}>About</button>
         </nav>
@@ -534,8 +537,8 @@ export default function Home() {
       </header>
 
       <section className="portfolio-toolbar" aria-label="Current portfolio">
-        <label className="portfolio-switcher"><select aria-label="Choose portfolio" value={portfolioSource==="demo"?demoKey:"uploaded"} onChange={event=>event.target.value!=="uploaded"&&loadDemo(event.target.value as DemoKey)}><option value="example">US Equity Portfolio</option>{portfolioSource==="uploaded"&&<option value="uploaded">Uploaded portfolio</option>}</select></label>
-        <span className="toolbar-badge">{portfolioSource==="demo"?"DEMO":"UPLOADED"}</span>
+        <label className="portfolio-switcher"><select aria-label="Choose portfolio" value={portfolioSource==="demo"?demoKey:"uploaded"} onChange={event=>event.target.value!=="uploaded"&&loadDemo(event.target.value as DemoKey)}><option value="example">US Equity Portfolio</option><option value="ai">AI Theme Portfolio</option>{portfolioSource==="uploaded"&&<option value="uploaded">Uploaded portfolio</option>}</select></label>
+        <span className="toolbar-badge">{isAI?"RESEARCH":portfolioSource==="demo"?"DEMO":"UPLOADED"}</span>
         <strong className="toolbar-value">{money(total)}</strong>
         <span className="toolbar-holdings">{holdings.filter(h=>h.ticker!=="CASH"&&h.value!==0).length} positions · USD{isExample&&exampleSnapshot?` · ${exampleSnapshot.date}`:""}{hasShort?` · ${(grossExposure/Math.max(total,1)*100).toFixed(0)}% gross`:""}</span>
         <div className="portfolio-tools">
@@ -576,7 +579,7 @@ export default function Home() {
         {view === "Strategy Analysis" && marketData && (isPublishedFund?<section className="data-state"><div><strong>The fund’s allocation is managed by AQR</strong><p>Daily underlying weights are not available here. Strategy Lab sliders cannot change the fund’s historical trades. Choose the US Equity Portfolio to construct and inspect a dynamic allocation.</p></div></section>:hasShort?<section className="data-state"><div><strong>Dynamic Strategy is currently long-only</strong><p>Switch to the US Equity Portfolio demo or remove short positions. Portfolios with short positions can still be analyzed in Portfolio, Risk &amp; Attribution, Compare, Performance and Scenarios.</p></div></section>:<StrategyAnalysis strategy={strategyAnalytics} snapshot={riskTargetSnapshot} isUpdating={strategyBacktestUpdating} total={total} frequency={strategyFrequency} setFrequency={setStrategyFrequency} targetVolatility={strategyTargetVolatility} setTargetVolatility={setStrategyTargetVolatility} targetBeta={strategyTargetBeta} setTargetBeta={setStrategyTargetBeta} maxPosition={strategyMaxPosition} setMaxPosition={setStrategyMaxPosition} applied={deferredStrategyConfig} hasPendingChanges={strategyHasPendingChanges} onRunBacktest={()=>setAppliedStrategyConfig({frequency:strategyFrequency,targetVolatility:strategyTargetVolatility,targetBeta:strategyTargetBeta,maxPosition:strategyMaxPosition})} onResetDraft={()=>{setStrategyFrequency(appliedStrategyConfig.frequency);setStrategyTargetVolatility(appliedStrategyConfig.targetVolatility);setStrategyTargetBeta(appliedStrategyConfig.targetBeta);setStrategyMaxPosition(appliedStrategyConfig.maxPosition)}} onSelectTicker={setSelectedTicker} payload={marketData} startDate={analytics?.startDate??analysisStart} endDate={analytics?.endDate??analysisEnd} />)}
         {view === "Security Analysis" && analytics && <SecurityAnalysisWorkspace holdings={holdings} selectedTicker={selectedTicker} onSelectTicker={setSelectedTicker} security={securityAnalytics} portfolio={analytics} total={total} />}
         {(view === "Optimizer" || view === "Compare") && marketData && <div hidden={view!=="Optimizer"}><PortfolioOptimizer key={`${covarianceForecast?.asOf}-${holdings.map(h=>`${h.ticker}:${h.value}`).join("|")}`} holdings={holdings} payload={marketData} forecast={covarianceForecast} onSelectTicker={setSelectedTicker} onApply={(weights,snapshot)=>{setOptimizerProposal({weights,snapshot,signature:holdings.map(h=>`${h.ticker}:${h.value}`).join("|"),id:Date.now()});setView("Compare");}}/></div>}
-        {isStatisticalView && <StatisticalModel holdings={holdings} holdingsDate={isExample?exampleSnapshot?.date??"":analysisEnd}/> }
+        {isStatisticalView && <StatisticalModel holdings={holdings} holdingsDate={isAI?AI_PORTFOLIO_DATE:isExample?exampleSnapshot?.date??"":analysisEnd} portfolioName={portfolioName} isAI={isAI}/> }
         {view === "Risk Analysis" && !isStatisticalView && analytics && marketData && !(isPublishedFund&&(riskTab==="Covariance Forecast"||riskTab==="Correlations")) && <RiskWorkspace tab={riskTab} model={factorModel} total={total} holdings={holdings} analytics={analytics} payload={marketData} forecast={covarianceForecast} onSelectTicker={setSelectedTicker} />}
         {view === "Risk Analysis" && isPublishedFund && (riskTab==="Covariance Forecast"||riskTab==="Correlations") && <section className="data-state"><div><strong>Underlying holdings history is unavailable</strong><p>The published demo provides the fund’s return series. A cross-security covariance or correlation matrix requires the underlying security universe and dated positions. Use the US Equity Portfolio or an uploaded portfolio for these tools.</p></div></section>}
         {view === "Performance" && analytics && factorModel && marketData && <PerformanceWorkspace tab={performanceTab} setTab={setPerformanceTab} total={total} analytics={analytics} model={factorModel} payload={marketData} holdings={holdings} onSelectTicker={setSelectedTicker} onExploreCorrelations={openEventCorrelations} />}

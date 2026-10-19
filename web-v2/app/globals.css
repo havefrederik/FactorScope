@@ -598,3 +598,14 @@
 .ai-methodology strong{color:#e0e6e2}
 .ai-methodology a{color:#8ac5ed;text-underline-offset:3px}
 @media(max-width:700px){.ai-methodology-columns{grid-template-columns:1fr;gap:12px}}
+
+/* Inspect the exact daily cumulative decomposition without obscuring the plot. */
+.decomposition-legend{pointer-events:none}
+.decomposition-legend .decomposition-readout-date{font-size:9px;color:#c8d3d8;margin:0 0 5px;font-weight:400}
+.decomposition-readout-date time{font-family:var(--font-geist-mono);color:#edf1ef}
+.decomposition-hit-area{cursor:crosshair}
+.decomposition-hover-guide{pointer-events:none}
+.decomposition-hover-guide line{stroke:#e5ecea;stroke-width:1;vector-effect:non-scaling-stroke}
+.decomposition-hover-guide .decomposition-hover-point{stroke:#fff;stroke-width:5;stroke-linecap:round}
+.decomposition-date-axis .decomposition-hover-date{position:absolute;bottom:0;z-index:5;white-space:nowrap;background:#dbe4e1;color:#172020;border-radius:2px;padding:3px 5px;font:9px var(--font-geist-mono)}
+.decomposition-chart:focus-visible{outline:1px solid #bacbc9;outline-offset:-1px}

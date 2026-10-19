@@ -123,7 +123,30 @@ function PerformanceChart({ portfolio, benchmark, tertiary, dates, startDate, en
 
 function DecompositionChart({ decomposition }: { decomposition: SecurityDrilldownAnalytics["decomposition"] }) {
   const [displayMode,setDisplayMode]=useState<"stacked"|"cumulative">("stacked");
+  const [inspectedDate,setInspectedDate]=useState<string|null>(null);
   const length = decomposition.dates.length;
+  const inspectedIndex=inspectedDate===null?-1:decomposition.dates.indexOf(inspectedDate);
+  const inspecting=inspectedIndex>=0;
+  const readoutIndex=inspecting?inspectedIndex:length-1;
+  const readoutDate=decomposition.dates[readoutIndex];
+  function inspectPointer(event: React.PointerEvent<SVGSVGElement>){
+    const rect=event.currentTarget.getBoundingClientRect();
+    if(!length||rect.width<=0)return;
+    const plotX=(event.clientX-rect.left)/rect.width*100;
+    const index=Math.max(0,Math.min(length-1,Math.round((plotX-1)/96*Math.max(length-1,1))));
+    setInspectedDate(decomposition.dates[index]);
+  }
+  function inspectKey(event: React.KeyboardEvent<HTMLDivElement>){
+    let index=readoutIndex;
+    if(event.key==='ArrowLeft')index--;
+    else if(event.key==='ArrowRight')index++;
+    else if(event.key==='Home')index=0;
+    else if(event.key==='End')index=length-1;
+    else if(event.key==='Escape'){setInspectedDate(null);event.preventDefault();return;}
+    else return;
+    event.preventDefault();
+    setInspectedDate(decomposition.dates[Math.max(0,Math.min(length-1,index))]);
+  }
   const indexes = Array.from({ length }, (_, index) => index);
   const components = [
     ...decomposition.factors.map((factor, index) => ({ key: factor.name, label: factor.name, group: factor.group, values: factor.values, className: `decomp-factor-${index}` })),
@@ -167,22 +190,7 @@ function DecompositionChart({ decomposition }: { decomposition: SecurityDrilldow
   for(let index=1;index<endLabels.length;index++)endLabels[index].top=Math.max(endLabels[index].top,endLabels[index-1].top+labelGap);
   if((endLabels.at(-1)?.top??0)>94){endLabels[endLabels.length-1].top=94;for(let index=endLabels.length-2;index>=0;index--)endLabels[index].top=Math.min(endLabels[index].top,endLabels[index+1].top-labelGap)}
   if((endLabels[0]?.top??5)<5){const shift=5-endLabels[0].top;endLabels.forEach(label=>label.top+=shift)}
-  return <>
-    <div className="decomposition-toolbar"><button type="button" aria-pressed={displayMode==="stacked"} className={displayMode==="stacked"?"active":""} onClick={()=>setDisplayMode("stacked")}>STACKED</button><button type="button" aria-pressed={displayMode==="cumulative"} className={displayMode==="cumulative"?"active":""} onClick={()=>setDisplayMode("cumulative")}>CUMULATIVE RETURN</button><b>{displayMode==="stacked"?`${length.toLocaleString()} DAILY OBSERVATIONS · EACH BAR = CUMULATIVE THROUGH DATE`:`${length.toLocaleString()} TRADING DAYS · DAILY-LINKED LINES`}</b></div>
-    <div className="decomposition-frame">
-      <div className="decomposition-legend">
-        <strong>{displayMode==="stacked"?"RETURN COMPONENTS":"CUMULATIVE RETURN SERIES"}</strong>
-        <span><i className="decomp-observed"/>Observed return<em>Total</em><b>{pct(observedEnd*100)}</b></span>
-        {displayMode==="stacked" ? components.map((component) => <span key={component.key}><i className={component.className}/>{component.label}<em>{"group" in component ? component.group : "Residual"}</em><b>{pp((component.values.at(-1) ?? 0)*100)}</b></span>) : <><span><i className="decomp-systematic"/>Systematic fitted<em>Model</em><b>{pct(systematicEnd*100)}</b></span><span><i className="decomp-idio"/>Idiosyncratic contribution<em>Residual</em><b>{pct(idiosyncraticEnd*100)}</b></span></>}
-      </div>
-      <div className="decomposition-axis">{ticks.map((tick)=><span key={tick} style={{top:`${y(tick)}%`}}>{(tick*100).toFixed(0)}%</span>)}</div>
-      <div className="decomposition-end-labels">{endLabels.map((label)=><span key={label.key} className={label.className} style={{top:`${label.top}%`}}><em>{label.label}</em>{label.key==="observed"?pct(label.value*100):pp(label.value*100)}</span>)}</div>
-      <div className="decomposition-chart">
-        <svg viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label={displayMode==="stacked"?"Cumulative factor-level return decomposition with individual market, style, sector and idiosyncratic contributions":"Cumulative observed, systematic fitted and idiosyncratic contribution return lines"}>
-          {ticks.map((tick) => <line key={tick} x1="0" x2="100" y1={y(tick)} y2={y(tick)} className="gridline"/>)}
-          {dateTickIndexes.map((index)=><line key={index} x1={x(index)} x2={x(index)} y1="5" y2="94" className="decomposition-guide"/>)}
-          <line x1="0" x2="100" y1={y(0)} y2={y(0)} className="decomposition-zero"/>
-          {displayMode==="stacked" && indexes.flatMap((index, position) => {
+  const stackedBars=useMemo(()=>displayMode==="stacked"?indexes.flatMap((index, position) => {
             let positiveBase = 0;
             let negativeBase = 0;
             const orderedComponents = components
@@ -198,12 +206,32 @@ function DecompositionChart({ decomposition }: { decomposition: SecurityDrilldow
               if (value >= 0) positiveBase = end; else negativeBase = end;
               return <rect key={`${component.key}-${index}`} x={x(position)-barWidth/2} y={Math.min(y(start),y(end))} width={barWidth} height={Math.max(Math.abs(y(start)-y(end)),.1)} className={component.className}><title>{`${decomposition.dates[index]} · ${component.label} cumulative contribution ${pp(value*100)}`}</title></rect>;
             });
-          })}
-          {endLabels.map((label)=><line key={`leader-${label.key}`} x1="97" x2="100" y1={label.rawTop} y2={label.top} className={`decomposition-leader ${label.className}`}/>) }
+          }):null,[decomposition,displayMode]);
+  return <>
+    <div className="decomposition-toolbar"><button type="button" aria-pressed={displayMode==="stacked"} className={displayMode==="stacked"?"active":""} onClick={()=>setDisplayMode("stacked")}>STACKED</button><button type="button" aria-pressed={displayMode==="cumulative"} className={displayMode==="cumulative"?"active":""} onClick={()=>setDisplayMode("cumulative")}>CUMULATIVE RETURN</button><b>{displayMode==="stacked"?`${length.toLocaleString()} DAILY OBSERVATIONS · EACH BAR = CUMULATIVE THROUGH DATE`:`${length.toLocaleString()} TRADING DAYS · DAILY-LINKED LINES`}</b></div>
+    <div className="decomposition-frame" onPointerLeave={event=>{if(event.pointerType!=="touch")setInspectedDate(null);}}>
+      <div className="decomposition-legend">
+        <strong>{displayMode==="stacked"?"RETURN COMPONENTS":"CUMULATIVE RETURN SERIES"}</strong>
+        <small className="decomposition-readout-date">Cumulative through <time dateTime={readoutDate}>{readoutDate}</time></small>
+        <span><i className="decomp-observed"/>Observed return<em>Total</em><b>{pct((decomposition.observed[readoutIndex]??0)*100)}</b></span>
+        {displayMode==="stacked" ? components.map((component) => <span key={component.key}><i className={component.className}/>{component.label}<em>{"group" in component ? component.group : "Residual"}</em><b>{pp((component.values[readoutIndex]??0)*100)}</b></span>) : <><span><i className="decomp-systematic"/>Systematic fitted<em>Model</em><b>{pp((decomposition.systematic[readoutIndex]??0)*100)}</b></span><span><i className="decomp-idio"/>Idiosyncratic contribution<em>Residual</em><b>{pp((decomposition.idiosyncratic[readoutIndex]??0)*100)}</b></span></>}
+      </div>
+      <div className="decomposition-axis">{ticks.map((tick)=><span key={tick} style={{top:`${y(tick)}%`}}>{(tick*100).toFixed(0)}%</span>)}</div>
+      <div className="decomposition-end-labels" hidden={inspecting}>{endLabels.map((label)=><span key={label.key} className={label.className} style={{top:`${label.top}%`}}><em>{label.label}</em>{label.key==="observed"?pct(label.value*100):pp(label.value*100)}</span>)}</div>
+      <div className="decomposition-chart" tabIndex={0} role="slider" aria-label="Inspect return decomposition by date" aria-valuemin={0} aria-valuemax={Math.max(0,length-1)} aria-valuenow={readoutIndex} aria-valuetext={readoutDate} onKeyDown={inspectKey} onBlur={()=>setInspectedDate(null)}>
+        <svg onPointerMove={inspectPointer} onPointerDown={inspectPointer} viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label={displayMode==="stacked"?"Cumulative factor-level return decomposition with individual market, style, sector and idiosyncratic contributions":"Cumulative observed, systematic fitted and idiosyncratic contribution return lines"}>
+          {ticks.map((tick) => <line key={tick} x1="0" x2="100" y1={y(tick)} y2={y(tick)} className="gridline"/>)}
+          {dateTickIndexes.map((index)=><line key={index} x1={x(index)} x2={x(index)} y1="5" y2="94" className="decomposition-guide"/>)}
+          <line x1="0" x2="100" y1={y(0)} y2={y(0)} className="decomposition-zero"/>
+          {stackedBars}
+          {!inspecting&&endLabels.map((label)=><line key={`leader-${label.key}`} x1="97" x2="100" y1={label.rawTop} y2={label.top} className={`decomposition-leader ${label.className}`}/>) }
           {displayMode==="cumulative" && <><polyline points={systematicPoints} className="decomposition-systematic-line"/><polyline points={idiosyncraticPoints} className="decomposition-idio-line"/></>}
           <polyline points={observedPoints} className="decomposition-observed-line"/>
+          {inspecting&&<g className="decomposition-hover-guide" aria-hidden="true"><line x1={x(readoutIndex)} x2={x(readoutIndex)} y1="5" y2="94"/><line x1={x(readoutIndex)-.5} x2={x(readoutIndex)+.5} y1={y(decomposition.observed[readoutIndex])} y2={y(decomposition.observed[readoutIndex])} className="decomposition-hover-point"/></g>}
+          <rect x="0" y="0" width="100" height="100" fill="transparent" className="decomposition-hit-area"/>
+
         </svg>
-        <div className="decomposition-date-axis">{dateTickIndexes.map((index,tickIndex)=><span key={decomposition.dates[index]} className={tickIndex===0?"first":tickIndex===dateTickIndexes.length-1?"last":""} style={{left:`${x(index)}%`}}>{formatDateTick(decomposition.dates[index])}</span>)}</div>
+        <div className="decomposition-date-axis">{inspecting&&<b className="decomposition-hover-date" style={{left:`${x(readoutIndex)}%`,transform:`translateX(${readoutIndex<length*.1?0:readoutIndex>length*.9?-100:-50}%)`}}>{readoutDate}</b>}{dateTickIndexes.map((index,tickIndex)=><span key={decomposition.dates[index]} className={tickIndex===0?"first":tickIndex===dateTickIndexes.length-1?"last":""} style={{left:`${x(index)}%`}}>{formatDateTick(decomposition.dates[index])}</span>)}</div>
       </div>
     </div>
     <p className="chart-definition">{displayMode==="stacked"?"Component labels are percentage-point (pp) contributions to portfolio return, not beta exposures. Every vertical bar corresponds to one trading day and shows cumulative contributions through that date. Within each positive and negative stack, factor contributions run from the smallest absolute value near zero to the largest outward; the idiosyncratic contribution is always the outermost layer. A narrow gap separates adjacent sessions.":"Observed return is shown against the cumulative fitted systematic return and cumulative idiosyncratic contribution."} Daily ETF-proxy factor effects are linked using beginning-of-day security wealth; the idiosyncratic component includes the intercept and residual, so the analysis reconciles exactly to the observed adjusted-price return.</p>

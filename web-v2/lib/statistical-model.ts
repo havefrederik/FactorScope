@@ -2,7 +2,8 @@ export type StatisticalStock={ticker:string;exposures:number[];specificVariance:
 export type FactorProfile={positive:{ticker:string;correlation:number}[];negative:{ticker:string;correlation:number}[]};
 export type StatisticalSnapshot={asOf:string;variant:string;population:string;donorCount:number;loading:string;dates:string[];observedCovariance:number[][];stockFactorCovariance:number[][];factorVariances:number[];covariance:number[][];stocks:StatisticalStock[];profiles:FactorProfile[]};
 export type StatisticalHistory={variant:string;loading:string;basket:string;points:{date:string;nHoldings:number;correlations:number[];risk:number[];volatility:number}[]};
-export type StatisticalBundle={schemaVersion:2;title:string;source:string;dataThrough:string;sourceHash:string;historyDates?:string[];universeNote:string;aiBasket:string[];snapshots:StatisticalSnapshot[];histories:StatisticalHistory[]};
+export type AiCoveragePoint={date:string;tickers:string[]};
+export type StatisticalBundle={schemaVersion:2;title:string;source:string;dataThrough:string;sourceHash:string;historyDates?:string[];aiCoverage?:AiCoveragePoint[];universeNote:string;aiBasket:string[];snapshots:StatisticalSnapshot[];histories:StatisticalHistory[]};
 const finite=(x:unknown):x is number=>typeof x==='number'&&Number.isFinite(x);
 const vector=(x:unknown,n:number):x is number[]=>Array.isArray(x)&&x.length===n&&x.every(finite);
 const date=(s:unknown):s is string=>typeof s==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(s)&&!Number.isNaN(Date.parse(s));
@@ -34,6 +35,11 @@ export function parseStatisticalBundle(input:unknown):StatisticalBundle{
   if(!h||!['REFERENCE','ONE_YEAR_EQUAL'].includes(h.variant)||h.loading!=='EW63'||!['AVAILABLE_NOT_AI35','AI35','AI32'].includes(h.basket)||!Array.isArray(h.points)||h.points.length>10000||!dates(h.points.map(p=>p.date)))fail();
   const key=h.variant+h.basket;if(historyKeys.has(key))fail();historyKeys.add(key);
   for(const p of h.points)if(!Number.isInteger(p.nHoldings)||p.nHoldings<32||p.nHoldings>35||(h.basket==='AI35'&&p.nHoldings!==35)||(h.basket==='AI32'&&p.nHoldings!==32)||p.date>b.dataThrough||!vector(p.correlations,20)||p.correlations.some(c=>c<0||c>1.00000001)||!vector(p.risk,4)||!finite(p.volatility)||p.volatility<0||Math.abs(p.risk.reduce((a,c)=>a+c,0)-p.volatility*1e4)>1e-5)fail();
+ }
+ if(b.aiCoverage!==undefined){
+  const h=b.histories.find(h=>h.variant==='ONE_YEAR_EQUAL'&&h.basket==='AVAILABLE_NOT_AI35');
+  if(!Array.isArray(b.aiCoverage)||!h||b.aiCoverage.length!==h.points.length||!dates(b.aiCoverage.map(p=>p.date)))fail();
+  for(const [i,p] of b.aiCoverage.entries())if(!p||p.date!==h!.points[i].date||!Array.isArray(p.tickers)||p.tickers.length!==h!.points[i].nHoldings||new Set(p.tickers).size!==p.tickers.length||p.tickers.some(t=>!b.aiBasket.includes(t)))fail();
  }
  return b;
 }

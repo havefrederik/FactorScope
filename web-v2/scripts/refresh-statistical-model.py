@@ -87,6 +87,7 @@ def main():
         for basket in ('AVAILABLE_NOT_AI35','AI35','AI32'):
             points=[p for row in rows for h in row['histories'] if h['variant']==variant and h['basket']==basket for p in h['points']]
             histories.append(dict(variant=variant,loading='EW63',basket=basket,points=points))
-    latest.update(histories=histories,historyDates=dates,exportChecks=[c for row in rows for c in row['exportChecks']]);(a.output_dir/'model.json').write_text(json.dumps(latest,separators=(',',':'),allow_nan=False))
+    latest.update(histories=histories,historyDates=dates,exportChecks=[c for row in rows for c in row['exportChecks']]);
+    latest['aiCoverage']=[dict(date=row['snapshots'][0]['asOf'],tickers=[t for t in latest['aiBasket'] if t in {s['ticker'] for s in row['snapshots'][0]['stocks']}]) for row in rows];(a.output_dir/'model.json').write_text(json.dumps(latest,separators=(',',':'),allow_nan=False))
     print('Published manifest prepared privately:',len(dates),'model dates through',days[-1],flush=True)
 if __name__=='__main__':main()

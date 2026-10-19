@@ -1,6 +1,6 @@
 import type { MarketPayload, PortfolioAnalytics } from "./analytics.ts";
 
-export type ExampleDay = { date: string; nav: number; values: number[]; cash: number; rebalance: number };
+export type ExampleDay = { date: string; nav: number; values: number[]; returnValues?: number[]; cash: number; rebalance: number };
 export type ExampleRebalance = { date: string; month: string; targets: number[]; scores: (number | null)[]; eligible: number; cost: number; traded: number };
 const mean = (x: number[]) => x.reduce((a,b)=>a+b,0)/x.length;
 const variance = (x: number[]) => { const m=mean(x);return x.reduce((s,v)=>s+(v-m)**2,0)/Math.max(1,x.length-1); };

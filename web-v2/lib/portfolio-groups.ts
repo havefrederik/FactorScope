@@ -19,7 +19,7 @@ export function buildPortfolioGroups(payload: MarketPayload, example: Pick<Examp
     for(const group of groups){
       let capital=0,pnl=0;
       for(const i of group.indexes){
-        const endValue=day.values[i];if(endValue===0)continue;
+        const endValue=(day.returnValues??day.values)[i];if(endValue===0)continue;
         const before=prior?prices[i].get(prior):undefined,after=prices[i].get(day.date);
         if(before===undefined||after===undefined||!Number.isFinite(before)||!Number.isFinite(after)||before<=0||after<=0){group.incomplete=true;break;}
         const beginValue=endValue*before/after;capital+=beginValue;pnl+=endValue-beginValue;

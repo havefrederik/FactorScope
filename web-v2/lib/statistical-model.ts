@@ -2,7 +2,7 @@ export type StatisticalStock={ticker:string;exposures:number[];specificVariance:
 export type FactorProfile={positive:{ticker:string;correlation:number}[];negative:{ticker:string;correlation:number}[]};
 export type StatisticalSnapshot={asOf:string;variant:string;population:string;donorCount:number;loading:string;dates:string[];observedCovariance:number[][];stockFactorCovariance:number[][];factorVariances:number[];covariance:number[][];stocks:StatisticalStock[];profiles:FactorProfile[]};
 export type StatisticalHistory={variant:string;loading:string;basket:string;points:{date:string;nHoldings:number;correlations:number[];risk:number[];volatility:number}[]};
-export type StatisticalBundle={schemaVersion:2;title:string;source:string;dataThrough:string;sourceHash:string;universeNote:string;aiBasket:string[];snapshots:StatisticalSnapshot[];histories:StatisticalHistory[]};
+export type StatisticalBundle={schemaVersion:2;title:string;source:string;dataThrough:string;sourceHash:string;historyDates?:string[];universeNote:string;aiBasket:string[];snapshots:StatisticalSnapshot[];histories:StatisticalHistory[]};
 const finite=(x:unknown):x is number=>typeof x==='number'&&Number.isFinite(x);
 const vector=(x:unknown,n:number):x is number[]=>Array.isArray(x)&&x.length===n&&x.every(finite);
 const date=(s:unknown):s is string=>typeof s==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(s)&&!Number.isNaN(Date.parse(s));
@@ -11,6 +11,7 @@ export function parseStatisticalBundle(input:unknown):StatisticalBundle{
  const b=input as StatisticalBundle;
  const fail=()=>{throw new Error('This file is not a valid FactorScope statistical-model export.');};
  if(!b||b.schemaVersion!==2||!date(b.dataThrough)||typeof b.title!=='string'||typeof b.source!=='string'||typeof b.universeNote!=='string'||!Array.isArray(b.aiBasket)||b.aiBasket.length!==35||!b.aiBasket.every(x=>typeof x==='string')||!Array.isArray(b.snapshots)||!b.snapshots.length||b.snapshots.length>500||!Array.isArray(b.histories))fail();
+ if(b.historyDates&&(!dates(b.historyDates)||b.historyDates.length>1000||b.historyDates.some(d=>d>b.dataThrough)||!/^([a-f0-9]{64})$/.test(b.sourceHash)))fail();
  const keys=new Set<string>();
  for(const s of b.snapshots){
   if(!s||!date(s.asOf)||s.asOf>b.dataThrough||!['REFERENCE','ONE_YEAR_EQUAL'].includes(s.variant)||s.loading!=='EW63'||!Number.isInteger(s.donorCount)||s.donorCount<21||typeof s.population!=='string'||!dates(s.dates,250)||s.dates.at(-1)!==s.asOf||!Array.isArray(s.covariance)||s.covariance.length!==20||!s.covariance.every(r=>vector(r,20))||!Array.isArray(s.stocks)||s.stocks.length>5000||!s.stocks.length||!Array.isArray(s.profiles)||s.profiles.length!==20)fail();

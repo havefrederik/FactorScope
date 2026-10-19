@@ -52,3 +52,25 @@ test('private API exposes only chart outputs, rejects writes, and never stores v
  const badOrigin=await handle(new Request(url,{headers:{origin:'https://unrelated.example'}}));assert.equal(badOrigin.status,403);
  const accepted=await handle(new Request(url,{method:'PUT',headers:{authorization:'Bearer test-secret'},body:stored}));assert.equal(accepted.status,200);assert.equal(writes,1);
 });
+
+test('history uses each dated model, keeps weights fixed and returns only displayed outputs',async()=>{
+ const {createStatisticalApi}=await import('../lib/statistical-api.ts');
+ const b=fixture();b.sourceHash='a'.repeat(64);
+ const earlier=structuredClone(b.snapshots[0]);earlier.asOf='2025-09-06';earlier.dates=earlier.dates.map(d=>new Date(Date.parse(d)-86400000).toISOString().slice(0,10));earlier.covariance[0][0]=.0004;
+ b.historyDates=[earlier.asOf,b.dataThrough];
+ const dated={...b,snapshots:[earlier],historyDates:undefined};
+ let writes=0;const handle=createStatisticalApi(()=>({adminToken:'secret',bucket:{get:async key=>({text:async()=>JSON.stringify(key==='statistical-model-ew63-v2'?b:dated)}),put:async()=>{writes++}}}));
+ const response=await handle(new Request('https://example.test',{method:'POST',body:JSON.stringify({view:'history',variant:'ONE_YEAR_EQUAL',holdings:[{ticker:'A',value:100}]})}));
+ assert.equal(response.status,200);const page=await response.json();assert.equal(page.points.length,2);assert.equal(page.nextCursor,null);assert.ok(page.points[0].volatility>page.points[1].volatility);assert.equal(writes,0);
+ for(const point of page.points){assert.equal(point.nHoldings,1);assert.ok(Math.abs(point.risk.reduce((a,b)=>a+b,0)-point.volatility*10000)<1e-10);assert.equal(point.correlations[0],1);}
+ for(const field of ['covariance','exposures','factorReturns','specificVariance'])assert.ok(!JSON.stringify(page).includes('"'+field+'"'));
+});
+test('history reports incomplete coverage instead of silently reweighting',async()=>{
+ const {createStatisticalApi}=await import('../lib/statistical-api.ts');const b=fixture();
+ const handle=createStatisticalApi(()=>({adminToken:'secret',bucket:{get:async()=>({text:async()=>JSON.stringify(b)}),put:async()=>assert.fail('No portfolio persistence')}}));
+ const page=await (await handle(new Request('https://example.test',{method:'POST',body:JSON.stringify({view:'history',variant:'ONE_YEAR_EQUAL',holdings:[{ticker:'A',value:50},{ticker:'MISSING',value:50}]})}))).json();
+ assert.equal(page.points.length,0);assert.equal(page.skipped.length,1);assert.match(page.skipped[0].reason,/MISSING/);
+});
+test('historical manifest rejects future dates and duplicate dates',()=>{
+ for(const ds of [[snapshot.asOf,'2099-01-01'],[snapshot.asOf,snapshot.asOf]]){const b=fixture();b.sourceHash='a'.repeat(64);b.historyDates=ds;assert.throws(()=>parseStatisticalBundle(b));}
+});

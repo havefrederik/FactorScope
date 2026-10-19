@@ -1,0 +1,11 @@
+export default function AiMethodology(){
+  return <details className="ai-methodology">
+    <summary>What follows Axioma, and what FactorScope assumes</summary>
+    <div className="ai-methodology-columns">
+      <section><h3>Documented by Axioma</h3><p>The study uses an equal-weighted 35-stock AI basket, with its weighting scheme kept constant over the study period. It reports trailing 250-day factor correlations at weekly intervals and statistical risk decomposition.</p><p>The paper does not specify a daily trading or rebalancing schedule. Equal weights in risk analysis alone do not establish how a cumulative performance series was constructed.</p></section>
+      <section><h3>FactorScope reconstruction</h3><p><strong>Daily rebalancing is our assumption.</strong> The overview resets equal weights at each close; those weights earn the next session’s returns. The 32–35-stock coverage adjustment and Yahoo-adjusted price history are our reconstruction choices. Trading costs are excluded.</p><p><strong>Sharpe is calculated by FactorScope.</strong> It is the mean daily portfolio return divided by its sample standard deviation, multiplied by √252, using a 0% risk-free rate over the displayed period. It is not an Axioma-reported result.</p></section>
+    </div>
+    <p>The default one-year extraction and 63-session loading half-life are our selected reconstruction specification, not a verified match to Axioma’s proprietary model. The AI basket and model variants were examined retrospectively; the displayed performance is illustrative, not an out-of-sample strategy test.</p>
+    <a href="https://www.simcorp.com/resources/insights/white-papers-and-reports/we-found-the-ai-risk-factor" target="_blank" rel="noreferrer">Source: Axioma study, portfolio construction and factor analysis (pp. 3–7) ↗</a>
+  </details>;
+}

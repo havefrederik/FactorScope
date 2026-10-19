@@ -5,6 +5,7 @@ import type { ExamplePortfolioResult } from "@/lib/example-portfolio";
 import { buildPortfolioGroups } from "@/lib/portfolio-groups";
 import GroupReturnsChart, { groupStyle } from "./group-returns-chart";
 import PortfolioHoldings from "./portfolio-holdings";
+import AiMethodology from "./ai-methodology";
 
 const money=(n:number)=>new Intl.NumberFormat("en-US",{style:"currency",currency:"USD",maximumFractionDigits:0}).format(n);
 const pct=(n:number)=>`${(100*n).toFixed(2)}%`;
@@ -34,7 +35,7 @@ export default function ExamplePortfolio({payload,example,sectors,firstMonth,set
         <button className="example-export" onClick={download} aria-label="Download daily holdings CSV">Export holdings ↓</button>
       </div>
     </header>
-    {methodology&&<p className="archive-table-note">{methodology}</p>}
+    {methodology&&<><p className="archive-table-note ai-reconstruction-note">{methodology}</p><AiMethodology/></>}
     <div className="portfolio-overview-grid">
       <div className="portfolio-chart-stack">
         <section className="panel example-chart overview-main-chart">
@@ -54,9 +55,10 @@ export default function ExamplePortfolio({payload,example,sectors,firstMonth,set
           <div className="archive-metrics example-metrics">
             <article title={methodology?"Cumulative portfolio return; costs excluded":"Cumulative portfolio return after estimated execution costs"}><span>Total return</span><strong>{pct(example.analytics.totalReturn)}</strong></article>
             <article title="Compound annual growth rate over the displayed period"><span>Annualized return</span><strong>{example.annualReturn===null?"—":pct(example.annualReturn)}</strong></article>
-            <article title="Annualized Sharpe ratio using a 0% risk-free rate"><span>Sharpe ratio</span><strong>{example.sharpe?.toFixed(2)??"—"}</strong></article>
+            <article title="Annualized Sharpe ratio using a 0% risk-free rate"><span>{methodology?"Sharpe · reconstruction":"Sharpe ratio"}</span><strong>{example.sharpe?.toFixed(2)??"—"}</strong></article>
             <article title="Historical market beta against the S&P 500"><span>Market beta</span><strong>{example.analytics.beta.toFixed(2)}</strong></article>
           </div>
+          {methodology&&<p className="ai-sharpe-note">FactorScope Sharpe estimate · 0% risk-free rate · trading costs excluded. Not an Axioma-reported result.</p>}
         </section>
         <PortfolioHoldings positions={positions} total={day.nav} history={{dates:example.days.map(day=>day.date),selectedDate:day.date,onSelectDate:setSelectedDate}} allocation={allocation} grouping={grouping} onGroupingChange={mode=>{setGrouping(mode);if(mode==="Sectors")setChartView("Returns by group");}} selectedGroup={selectedGroup} onSelectGroup={selectGroup} groupColors={Object.fromEntries(grouped.groups.map((group,i)=>[group.name,groupStyle(group.name).color]))} onSelectTicker={onSelectTicker} footer={methodology?<p className="archive-table-note">{historyNote}</p>:<details className="example-cost-settings"><summary>Transaction costs <span>{cost} bps</span></summary><div><label>Execution cost (bps)<input aria-label="Example execution cost" type="number" min="0" max="100" value={cost} onChange={e=>setCost(Math.min(100,Math.max(0,Number(e.target.value))))}/></label><p>Estimated total: <strong>{money(example.totalCosts)}</strong>. Portfolio performance is shown after these costs; sector return paths are gross.</p></div></details>}/>
       </aside>

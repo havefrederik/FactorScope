@@ -51,3 +51,12 @@ test('missing monthly observations exclude securities and unused 5% slots remain
  const original=r.rebalances[0].targets;for(const ticker of universe)payload.series[ticker].points.filter(p=>p.date.startsWith('2025-02')).forEach(p=>p.close*=2);
  assert.deepEqual(buildExamplePortfolio(payload,universe,'2025-01-01','2025-03-10',0).rebalances[0].targets,original);
 });
+
+test('statistical history takes exact dated holdings, including cash and drift, without extending history',async()=>{
+ const {exampleStatisticalHoldings}=await import('../lib/example-portfolio.ts');
+ const {payload,universe}=fixture();const r=buildExamplePortfolio(payload,universe,'2025-01-01','2025-03-10',5);
+ const history=exampleStatisticalHoldings(r,['2024-12-31','2025-01-15','2025-01-18','2025-02-03','2025-03-07']);
+ assert.deepEqual(history.map(p=>p.asOf),['2025-01-15','2025-02-03']);
+ for(const point of history){const exact=exampleHoldingsSnapshot(r,point.asOf);assert.deepEqual(point.holdings,exact.holdings);near(point.holdings.reduce((sum,h)=>sum+h.value,0),exact.nav);}
+ assert.notDeepEqual(history[0].holdings.map(h=>h.value/history[0].holdings.reduce((s,p)=>s+p.value,0)),history[1].holdings.map(h=>h.value/history[1].holdings.reduce((s,p)=>s+p.value,0)));
+});

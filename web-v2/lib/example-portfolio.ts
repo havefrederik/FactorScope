@@ -69,3 +69,13 @@ export function exampleHoldingsSnapshot(example: ExamplePortfolioResult, asOf?: 
   const day=example.days[index];
   return {date:day.date,nav:day.nav,holdings:[...example.tickers.map((ticker,j)=>({ticker,value:day.values[j]})).filter(h=>h.value>1e-8),{ticker:"CASH",value:day.cash}]};
 }
+
+// End-of-day holdings for actual model dates only. Do not invent positions before
+// the first allocation, bridge a missing session, or carry stale weights beyond history.
+export function exampleStatisticalHoldings(example: ExamplePortfolioResult, modelDates: string[]) {
+  const byDate=new Map(example.days.filter(day=>day.rebalance>=0).map(day=>[day.date,day]));
+  return modelDates.flatMap(asOf=>{
+    const day=byDate.get(asOf);if(!day)return [];
+    return [{asOf,holdings:[...example.tickers.map((ticker,j)=>({ticker,value:day.values[j]})).filter(h=>Math.abs(h.value)>1e-8),{ticker:'CASH',value:day.cash}]}];
+  });
+}

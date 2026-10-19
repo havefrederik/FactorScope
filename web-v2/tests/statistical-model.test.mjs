@@ -74,3 +74,15 @@ test('history reports incomplete coverage instead of silently reweighting',async
 test('historical manifest rejects future dates and duplicate dates',()=>{
  for(const ds of [[snapshot.asOf,'2099-01-01'],[snapshot.asOf,snapshot.asOf]]){const b=fixture();b.sourceHash='a'.repeat(64);b.historyDates=ds;assert.throws(()=>parseStatisticalBundle(b));}
 });
+
+test('dated history uses each date’s holdings and cash, never the selected fixed-weight fallback',async()=>{
+ const {createStatisticalApi}=await import('../lib/statistical-api.ts');const b=fixture();
+ const earlier=structuredClone(b.snapshots[0]);earlier.asOf='2025-09-06';earlier.dates=earlier.dates.map(d=>new Date(Date.parse(d)-86400000).toISOString().slice(0,10));b.snapshots.unshift(earlier);
+ const handle=createStatisticalApi(()=>({adminToken:'secret',bucket:{get:async()=>({text:async()=>JSON.stringify(b)}),put:async()=>assert.fail('No portfolio persistence')}}));
+ const payload={view:'history',variant:'ONE_YEAR_EQUAL',holdings:[{ticker:'B',value:100}],datedHoldings:[{asOf:earlier.asOf,holdings:[{ticker:'A',value:50},{ticker:'CASH',value:50}]},{asOf:snapshot.asOf,holdings:[{ticker:'CASH',value:100}]}]};
+ const request=body=>handle(new Request('https://example.test',{method:'POST',body:JSON.stringify(body)}));
+ const response=await request(payload);assert.equal(response.status,200);const page=await response.json();assert.equal(page.points.length,2);assert.equal(page.nextCursor,null);
+ assert.ok(Math.abs(page.points[0].volatility-analyseStatisticalPortfolio(earlier,payload.datedHoldings[0].holdings).volatility)<1e-12);assert.equal(page.points[1].volatility,0);assert.equal(page.points[1].nHoldings,0);
+ for(const datedHoldings of [[],[payload.datedHoldings[1],payload.datedHoldings[0]],[{asOf:'2099-01-01',holdings:[{ticker:'A',value:1}]}],[{asOf:earlier.asOf}]])assert.equal((await request({...payload,datedHoldings})).status,400);
+ const one=await (await request({...payload,datedHoldings:[payload.datedHoldings[0]]})).json();assert.equal(one.points.length,1);assert.equal(one.points[0].date,earlier.asOf);
+});

@@ -44,13 +44,15 @@ export function createStatisticalApi(getBindings:()=>{bucket:Store;adminToken:st
     return dated;
    }
    if(input.view==='history'){
-    const start=input.cursor??0;
+    const dated=input.datedHoldings;
+    if(dated!==undefined&&(!Array.isArray(dated)||!dated.length||dated.length>12||dated.some((p,i)=>!p||!dates.includes(p.asOf)||(i>0&&p.asOf<=dated[i-1].asOf)||!Array.isArray(p.holdings)||!p.holdings.length)))return json({error:'Supply valid dated holdings for up to 12 available model dates.'},400);
+    const start=dated?0:input.cursor??0;
     if(!Number.isInteger(start)||start<0||start>dates.length)return json({error:'Invalid history cursor.'},400);
     // At most 24 storage reads per request; four at a time to bound worker memory.
-    const slice=dates.slice(start,start+24),page:PortfolioHistoryPage={points:[],skipped:[],nextCursor:start+24<dates.length?start+24:null};
+    const slice=dated?dated.map(p=>p.asOf):dates.slice(start,start+24),page:PortfolioHistoryPage={points:[],skipped:[],nextCursor:!dated&&start+24<dates.length?start+24:null};
     for(let i=0;i<slice.length;i+=4){
      await Promise.all(slice.slice(i,i+4).map(async date=>{
-      try{page.points.push(statisticalHistoryPoint(await at(date),{...input,asOf:date}));}
+      try{page.points.push(statisticalHistoryPoint(await at(date),{...input,asOf:date,...(dated?{portfolio:undefined,holdings:dated.find(p=>p.asOf===date)!.holdings}:{})}));}
       catch(e){if(e instanceof Error&&e.message.startsWith('Model coverage missing:'))page.skipped.push({date,reason:e.message});else throw e;}
      }));
     }

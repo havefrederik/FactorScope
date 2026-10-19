@@ -1,7 +1,7 @@
 import {analyseStatisticalPortfolio,type StatisticalBundle} from './statistical-model.ts';
 export function statisticalMetadata(bundle:StatisticalBundle){return {title:bundle.title,source:bundle.source,dataThrough:bundle.dataThrough,universeNote:bundle.universeNote,histories:bundle.histories,snapshots:bundle.historyDates?bundle.historyDates.flatMap(asOf=>["ONE_YEAR_EQUAL","REFERENCE"].map(variant=>({asOf,variant}))):bundle.snapshots.map(s=>({asOf:s.asOf,variant:s.variant}))};}
 export type StatisticalMetadata=ReturnType<typeof statisticalMetadata>;
-export type StatisticalRequest={variant:string;asOf:string;portfolio?:string;holdings?:{ticker:string;value:number}[];view?:string;cursor?:number};
+export type StatisticalRequest={variant:string;asOf:string;portfolio?:string;holdings?:{ticker:string;value:number}[];view?:string;cursor?:number;datedHoldings?:{asOf:string;holdings:{ticker:string;value:number}[]}[]};
 export function statisticalDisplay(bundle:StatisticalBundle,input:StatisticalRequest){
  const snapshot=bundle.snapshots.find(s=>s.variant===input.variant&&s.asOf===input.asOf);
  if(!snapshot)throw new Error('Choose an available model date and specification.');

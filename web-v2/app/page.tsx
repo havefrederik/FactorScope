@@ -1,8 +1,9 @@
 "use client";
 
-import { ChangeEvent, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import StatisticalModel from "./statistical-model";
 import AboutMethodology from "./about-methodology";
+import CsvUploadDialog from "./csv-upload-dialog";
 import {aiPortfolioSeed, AI_PORTFOLIO_DATE} from "@/lib/ai-portfolio";
 import CovarianceForecastView from "./covariance-forecast";
 import { PublishedFundContext, PublishedFundHoldings } from "./published-fund";
@@ -382,6 +383,12 @@ function StrategyAnalysis(props: StrategyWorkspaceProps) {
 export default function Home() {
   const [view, setView] = useState<View>("Overview");
   const [csvGuideNavigation, setCsvGuideNavigation] = useState(0);
+  const [csvUploadOpen, setCsvUploadOpen] = useState(false);
+  function openCsvGuide() {
+    window.history.replaceState(null, "", "#about-csv");
+    setView("Methodology");
+    setCsvGuideNavigation(current => current + 1);
+  }
   useEffect(() => {
     if (window.location.hash === "#about-csv") {
       setView("Methodology");
@@ -552,11 +559,15 @@ export default function Home() {
   function loadDemo(key:DemoKey){const url=new URL(window.location.href);url.searchParams.set("portfolio",key);window.history.replaceState(null,"",url);const next=key==="ai"?aiPortfolioSeed:key==="published-market-neutral"?publishedMarketNeutralSeed:key==="published-dow"?publishedDowSeed:key==="example"?exampleSeed:equitySeed;setDemoKey(key);setHoldings(next.map(item=>({...item})));setBaselineHoldings(next.map(item=>({...item})));setPortfolioSource("demo");setPortfolioName(key==="ai"?"AI Theme Portfolio":key==="published-market-neutral"?"AQR Equity Market Neutral":key==="published-dow"?"Published Dow Strategy":key==="example"?"US Equity Portfolio":"US Equity Portfolio");setPortfolioError(null);setSelectedTicker(null);setEditing(false)}
   useEffect(()=>{if(new URLSearchParams(window.location.search).get("portfolio")==="example")loadDemo("example")},[]);
   function resetDemo(){loadDemo(demoKey)}
-  function upload(e: ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]; if (!file) return;
-    const reader = new FileReader(); reader.onload = () => {
-      try{const portfolio=parseHoldingsCsv(String(reader.result)).map(h=>({...h,beta:h.ticker==="CASH"?0:1,vol:25,risk:0}));setHoldings(portfolio);setBaselineHoldings(portfolio.map(item=>({...item})));setEditing(true);setPortfolioSource("uploaded");setPortfolioName(file.name.replace(/\.csv$/i,""));setPortfolioError(null)}catch(error){setPortfolioError(error instanceof Error?error.message:"Unable to read CSV.")}
-    }; reader.readAsText(file);
+  async function upload(file: File) {
+    const portfolio = parseHoldingsCsv(await file.text()).map(h => ({...h, beta: h.ticker === "CASH" ? 0 : 1, vol: 25, risk: 0}));
+    setHoldings(portfolio);
+    setBaselineHoldings(portfolio.map(item => ({...item})));
+    setEditing(true);
+    setPortfolioSource("uploaded");
+    setPortfolioName(file.name.replace(/\.csv$/i, ""));
+    setPortfolioError(null);
+    setView("Overview");
   }
 
   function openEventCorrelations(startDate:string,endDate:string){setAnalysisStart(startDate);setAnalysisEnd(endDate);setRiskTab("Correlations");setView("Risk Analysis")}
@@ -605,19 +616,12 @@ export default function Home() {
         <span className="toolbar-holdings">{(isAI&&view==="Overview"&&overviewSnapshot?overviewSnapshot.holdings:holdings).filter(h=>h.ticker!=="CASH"&&h.value!==0).length} positions · USD{isExample&&exampleSnapshot?` · ${exampleSnapshot.date}`:""}{hasShort?` · ${(grossExposure/Math.max(total,1)*100).toFixed(0)}% gross`:""}</span>
         <div className="portfolio-tools">
           {!isPublishedFund&&<button onClick={()=>{if(isReadOnlyPortfolio){setHoldings(holdings.map(h=>({...h})));setBaselineHoldings(holdings.map(h=>({...h})));setPortfolioSource("uploaded");setPortfolioName("My portfolio");setView("Optimizer");setEditing(true);}else setEditing(current=>!current);}}>{isReadOnlyPortfolio?"Customize portfolio":editing?"Close editor":"Edit portfolio"}</button>}
-          <div className="csv-upload-tools">
-            <label className="upload"><Icon name="upload"/>Upload CSV<input type="file" accept=".csv" onChange={upload}/></label>
-            <a className="csv-guide-link" href="#about-csv" onClick={event=>{
-              if(event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;
-              event.preventDefault();
-              window.history.replaceState(null,"","#about-csv");
-              setView("Methodology");
-              setCsvGuideNavigation(current=>current+1);
-            }}>CSV format guide</a>
-          </div>
+          <button type="button" onClick={()=>setCsvUploadOpen(true)}><Icon name="upload"/>Upload CSV</button>
           <button onClick={resetDemo}>Reset demo</button>
         </div>
       </section>
+
+      <CsvUploadDialog open={csvUploadOpen} onClose={()=>setCsvUploadOpen(false)} onGuide={openCsvGuide} onUpload={upload}/>
 
       <section className="workspace">
         {isArchivedPortfolio&&primarySection!=="About"?<PublishedDowPortfolio/>:(isExample||isAI)&&view==="Overview"?exampleWorkspace:<>

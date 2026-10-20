@@ -1,10 +1,10 @@
 "use client";
 import AiMethodology from "./ai-methodology";
-import {HOLDINGS_CSV_TEMPLATE} from "@/lib/holdings-template";
+import {downloadHoldingsTemplate, HOLDINGS_CSV_TEMPLATE} from "@/lib/holdings-template";
 
 const chapters=[['start','Find your way around'],['csv','Upload a portfolio'],['history','Understand the history'],['metrics','Read the numbers'],['models','Choose a risk model'],['ai','AI study & assumptions'],['strategy','Use Strategy Lab'],['data','Data & limitations']] as const;
 function Heading({number,title}:{number:string;title:string}){return <header><span className="guide-eyebrow">{number}</span><h2>{title}</h2></header>}
-function downloadTemplate(){const url=URL.createObjectURL(new Blob([HOLDINGS_CSV_TEMPLATE],{type:"text/csv;charset=utf-8"}));const link=document.createElement('a');link.href=url;link.download='factorscope-holdings-example.csv';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
+
 export default function AboutMethodology(){return <div className="about-guide">
   <nav className="guide-nav" aria-label="Guide sections"><strong>ON THIS PAGE</strong>{chapters.map(([id,label],i)=><a key={id} href={`#about-${id}`}><span>{String(i+1).padStart(2,'0')}</span>{label}</a>)}</nav>
   <div className="guide-content">
@@ -19,7 +19,7 @@ export default function AboutMethodology(){return <div className="about-guide">
         <tr><th scope="row"><code>name</code></th><td>No</td><td>A display name. If blank or omitted, the ticker is shown.</td></tr>
         <tr><th scope="row"><code>sector</code></th><td>No</td><td>A consistent sector label, such as <code>Technology</code>. If blank or omitted, the position is <em>Unclassified</em>; the importer does not infer a sector.</td></tr>
       </tbody></table></div>
-      <div className="guide-example"><div><h3>A $100,000 example</h3><p>45% Apple, 35% Microsoft and 20% cash.</p><button type="button" onClick={downloadTemplate}>Download example CSV ↓</button></div><pre aria-label="Example holdings CSV"><code>{HOLDINGS_CSV_TEMPLATE}</code></pre></div>
+      <div className="guide-example"><div><h3>A $100,000 example</h3><p>45% Apple, 35% Microsoft and 20% cash.</p><button type="button" onClick={downloadHoldingsTemplate}>Download example CSV ↓</button></div><pre aria-label="Example holdings CSV"><code>{HOLDINGS_CSV_TEMPLATE}</code></pre></div>
       <ol className="guide-steps"><li>Use a header row with <code>ticker</code> and <code>market_value</code>. Column order does not matter; headers are case-insensitive.</li><li>Save as a comma-separated UTF-8 <code>.csv</code> file. Use a decimal point, such as <code>1234.56</code>. Plain numbers without currency symbols or thousands separators are easiest.</li><li>Quote any cell containing a comma, for example <code>"Apple, Inc."</code> or <code>"45,000"</code>. A semicolon-separated file or decimal-comma number is not supported.</li><li>Upload the file, review the positions in the editor, then open Portfolio or Risk &amp; Attribution.</li></ol>
       <details><summary>Cash, short positions and duplicate rows</summary><p>The sum of all signed market values, including cash, must be positive. A long position of $50,000, a short of −$50,000 and $100,000 of cash gives a $100,000 portfolio value. A net-zero or net-short stock book needs sufficient positive cash/collateral.</p><p>If you omit CASH, its value is set to zero. Duplicate tickers are combined by adding their values; their sector labels must agree. Blank market values, invalid numbers and conflicting sectors are rejected.</p></details>
       <details><summary>If your file will not load</summary><p>Check that the first row contains the required headers, your separator is a comma, every position has a numeric value, and quotes are closed. Export a CSV from Excel instead of uploading an .xlsx file. If the file imports but prices are unavailable, check the ticker symbols and available trading history.</p><p>The daily-holdings export and the optimizer’s trade export use different columns and are not directly interchangeable with this upload. To import an exported position snapshot, select one date and map its dollar-value column to <code>market_value</code>.</p></details>

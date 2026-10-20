@@ -1,5 +1,6 @@
 export default function AiMethodology(){
-  return <article className="panel ai-methodology">
+  return <article id="about-ai" className="panel ai-methodology guide-section">
+    <span className="guide-eyebrow">06 / AI STUDY &amp; ASSUMPTIONS</span>
     <h2>AI portfolio methodology</h2>
     <p>What follows Axioma, and what FactorScope assumes.</p>
     <div className="ai-methodology-columns">

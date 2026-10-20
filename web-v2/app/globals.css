@@ -650,3 +650,6 @@
 .about-guide .ai-methodology{margin:0;background:var(--panel)}
 @media(max-width:1000px){.about-guide{grid-template-columns:1fr;gap:14px}.guide-nav{position:static;grid-template-columns:repeat(2,minmax(0,1fr));padding:0}.guide-nav>strong{grid-column:1/-1;margin-bottom:0}.guide-cards{grid-template-columns:1fr;gap:8px}.guide-example{grid-template-columns:1fr}.guide-section{padding:22px}}
 @media(max-width:600px){.guide-section{padding:18px}.guide-section h2{font-size:22px}.guide-nav a{font-size:12px;padding:8px 4px}.guide-section th,.guide-section td{padding:10px}.guide-table-wrap table{min-width:560px}.guide-example{padding:14px}.guide-section p,.guide-section li,.guide-section dd{font-size:13px}}
+
+.csv-upload-tools{display:flex;align-items:center;gap:9px}.csv-guide-link{color:var(--cyan);font-size:11px;text-decoration:underline;text-underline-offset:3px;white-space:nowrap}.csv-guide-link:hover{color:var(--text)}.csv-guide-link:focus-visible{outline:2px solid var(--cyan);outline-offset:4px}
+@media(max-width:760px){.portfolio-tools{flex-wrap:wrap}.csv-upload-tools{margin-right:auto}.portfolio-tools .csv-upload-tools .upload{margin-right:0}}

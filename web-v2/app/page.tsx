@@ -381,6 +381,22 @@ function StrategyAnalysis(props: StrategyWorkspaceProps) {
 
 export default function Home() {
   const [view, setView] = useState<View>("Overview");
+  const [csvGuideNavigation, setCsvGuideNavigation] = useState(0);
+  useEffect(() => {
+    if (window.location.hash === "#about-csv") {
+      setView("Methodology");
+      setCsvGuideNavigation(1);
+    }
+  }, []);
+  useEffect(() => {
+    if (!csvGuideNavigation || view !== "Methodology") return;
+    const frame = requestAnimationFrame(() => {
+      const section = document.getElementById("about-csv");
+      section?.focus({ preventScroll: true });
+      section?.scrollIntoView({ block: "start" });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [csvGuideNavigation]);
   const [demoKey,setDemoKey]=useState<DemoKey>("ai");
   const [customHoldings, setHoldings] = useState(aiPortfolioSeed);
   const [baselineHoldings, setBaselineHoldings] = useState(aiPortfolioSeed);
@@ -589,7 +605,16 @@ export default function Home() {
         <span className="toolbar-holdings">{(isAI&&view==="Overview"&&overviewSnapshot?overviewSnapshot.holdings:holdings).filter(h=>h.ticker!=="CASH"&&h.value!==0).length} positions · USD{isExample&&exampleSnapshot?` · ${exampleSnapshot.date}`:""}{hasShort?` · ${(grossExposure/Math.max(total,1)*100).toFixed(0)}% gross`:""}</span>
         <div className="portfolio-tools">
           {!isPublishedFund&&<button onClick={()=>{if(isReadOnlyPortfolio){setHoldings(holdings.map(h=>({...h})));setBaselineHoldings(holdings.map(h=>({...h})));setPortfolioSource("uploaded");setPortfolioName("My portfolio");setView("Optimizer");setEditing(true);}else setEditing(current=>!current);}}>{isReadOnlyPortfolio?"Customize portfolio":editing?"Close editor":"Edit portfolio"}</button>}
-          <label className="upload"><Icon name="upload"/>Upload CSV<input type="file" accept=".csv" onChange={upload}/></label>
+          <div className="csv-upload-tools">
+            <label className="upload"><Icon name="upload"/>Upload CSV<input type="file" accept=".csv" onChange={upload}/></label>
+            <a className="csv-guide-link" href="#about-csv" onClick={event=>{
+              if(event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;
+              event.preventDefault();
+              window.history.replaceState(null,"","#about-csv");
+              setView("Methodology");
+              setCsvGuideNavigation(current=>current+1);
+            }}>CSV format guide</a>
+          </div>
           <button onClick={resetDemo}>Reset demo</button>
         </div>
       </section>

@@ -75,7 +75,7 @@ test("exposure plot places positive and negative exposures on opposite sides of 
     assert.ok(rectangles[1].x < zero);
     assert.ok(Math.abs(rectangles[1].x + rectangles[1].width - zero) < 1e-9);
     assert.match(html, /Quality: -0\.350/);
-    assert.match(html, /Bars show signed exposure/);
+    assert.match(html, /Bars show signed beta exposures/);
     assert.match(html, /aria-label="Exposure label precision"/);
     assert.match(html, /6 decimals/);
     assert.match(html, /role="button" tabindex="0" aria-label="Quality: Current portfolio -0\.350000"/);

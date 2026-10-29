@@ -40,7 +40,7 @@ test("strategy analysis is point-in-time, risk targeted and explicit about const
   assert.match(analytics, /targetVolatility/);
   assert.match(analytics, /targetBeta/);
   assert.match(analytics, /maxPosition/);
-  assert.match(analytics, /annualizedSharpe/);
+  assert.match(analytics, /historicalSharpe/);
   assert.match(analytics, /staticSharpeRatio/);
   assert.match(analytics, /benchmarkSharpeRatio/);
   assert.match(analytics, /createCombinedIewmaPredictor/);

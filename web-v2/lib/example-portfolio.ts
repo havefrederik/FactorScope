@@ -1,3 +1,4 @@
+import { historicalSharpe } from "./historical-sharpe.ts";
 import type { MarketPayload, PortfolioAnalytics } from "./analytics.ts";
 
 export type ExampleDay = { date: string; nav: number; values: number[]; returnValues?: number[]; cash: number; rebalance: number };
@@ -58,7 +59,7 @@ export function buildExamplePortfolio(payload: MarketPayload, universe: string[]
   const analytics:PortfolioAnalytics={dates,curve,benchmarkCurve,dailyReturns,benchmarkReturns,totalReturn:curve.at(-1)!-1,benchmarkReturn:benchmarkCurve.at(-1)!-1,annualVolatility:Math.sqrt(v*252),beta:cov/Math.max(variance(benchmarkReturns),1e-12),maxDrawdown,pnl:days.at(-1)!.nav-1_000_000,startDate:dates[0],endDate:dates.at(-1)!,positions:[]};
   const elapsedYears=(Date.parse(dates.at(-1)!)-Date.parse(dates[0]))/(365.25*86400000);
   const annualReturn=elapsedYears>0?curve.at(-1)!**(1/elapsedYears)-1:null;
-  return {tickers,days,rebalances,analytics,totalCosts,annualReturn,sharpe:v>1e-20?avg/Math.sqrt(v)*Math.sqrt(252):null};
+  return {tickers,days,rebalances,analytics,totalCosts,annualReturn,sharpe:historicalSharpe(dates,dailyReturns,payload)};
 }
 
 export type ExamplePortfolioResult = NonNullable<ReturnType<typeof buildExamplePortfolio>>;

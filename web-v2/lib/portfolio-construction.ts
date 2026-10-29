@@ -5,6 +5,7 @@ export type ConstructionSnapshot = {
   forecast: CovarianceForecastAnalytics;
   factors: ConstructionFactor[];
   expectedReturns: number[] | null;
+  relativeSignals?: number[] | null;
   objective: string;
   returnAssumption: string | null;
 };
@@ -36,6 +37,7 @@ export function constructionMeasures(snapshot: ConstructionSnapshot, weights: Re
   const expectedReturn = snapshot.expectedReturns ? dot(snapshot.expectedReturns) : null;
   return {
     volatility, expectedReturn,
+    signalRisk: snapshot.relativeSignals && volatility > 1e-10 ? dot(snapshot.relativeSignals) / volatility : null,
     assumedSharpe: expectedReturn !== null && volatility > 1e-10 ? expectedReturn / volatility : null,
     gross: w.reduce((sum, value) => sum + Math.abs(value), 0), net: w.reduce((sum, value) => sum + value, 0),
     long: w.reduce((sum, value) => sum + Math.max(0, value), 0), short: w.reduce((sum, value) => sum + Math.max(0, -value), 0),

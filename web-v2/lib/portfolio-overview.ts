@@ -1,3 +1,4 @@
+import { historicalSharpe } from "./historical-sharpe.ts";
 import { buildAnalytics, type AnalyticsHolding, type MarketPayload } from './analytics.ts';
 import type { ExamplePortfolioResult } from './example-portfolio.ts';
 
@@ -18,7 +19,7 @@ export function buildHoldingsOverview(payload: MarketPayload, holdings: Analytic
   const rebalances=[{date:analytics.startDate,month:analytics.startDate.slice(0,7),targets:active.map(h=>h.value/initial),scores:active.map(()=>null),eligible:active.length,cost:0,traded:initial-cash}];
   const years=(Date.parse(analytics.endDate)-Date.parse(analytics.startDate))/(365.25*86400000);
   const avg=analytics.dailyReturns.reduce((a,b)=>a+b,0)/analytics.dailyReturns.length;
-  return {tickers,days,rebalances,analytics,totalCosts:0,annualReturn:years>0?(1+analytics.totalReturn)**(1/years)-1:null,sharpe:analytics.annualVolatility>1e-10?avg*252/analytics.annualVolatility:null};
+  return {tickers,days,rebalances,analytics,totalCosts:0,annualReturn:years>0?(1+analytics.totalReturn)**(1/years)-1:null,sharpe:historicalSharpe(analytics.dates,analytics.dailyReturns,payload)};
 }
 
 import type { AiCoveragePoint } from './statistical-model.ts';
@@ -61,5 +62,5 @@ export function buildCoverageOverview(payload:MarketPayload, coverage:AiCoverage
   let peak=1,maxDrawdown=0;curve.forEach(v=>{peak=Math.max(peak,v);maxDrawdown=Math.min(maxDrawdown,v/peak-1)});
   const analytics={dates,curve,benchmarkCurve,dailyReturns,benchmarkReturns,totalReturn:curve.at(-1)!-1,benchmarkReturn:benchmarkCurve.at(-1)!-1,annualVolatility:Math.sqrt(v*252),beta:cov/Math.max(variance(benchmarkReturns),1e-12),maxDrawdown,pnl:nav-1e6,startDate:dates[0],endDate:dates.at(-1)!,positions:[]};
   const years=(Date.parse(analytics.endDate)-Date.parse(analytics.startDate))/(365.25*86400000);
-  return {tickers,days,rebalances,analytics,totalCosts:0,annualReturn:years>0?curve.at(-1)!**(1/years)-1:null,sharpe:v>1e-20?avg/Math.sqrt(v)*Math.sqrt(252):null};
+  return {tickers,days,rebalances,analytics,totalCosts:0,annualReturn:years>0?curve.at(-1)!**(1/years)-1:null,sharpe:historicalSharpe(dates,dailyReturns,payload)};
 }

@@ -1,4 +1,5 @@
-import type { AnalyticsHolding, FactorModelAnalytics } from "./analytics.ts";
+import { historicalSharpe } from "./historical-sharpe.ts";
+import type { AnalyticsHolding, FactorModelAnalytics, MarketPayload } from "./analytics.ts";
 
 export type ComparisonPreset = "Lower beta" | "Equal weight" | "Current weights" | "Saved baseline";
 
@@ -49,12 +50,12 @@ export function comparisonHoldings(holdings: AnalyticsHolding[], weights: Record
   return [...stocks, { ticker: "CASH", value: total - stocks.reduce((sum, item) => sum + item.value, 0) }];
 }
 
-export function replayStatistics(dates: string[], dailyReturns: number[], totalReturn: number) {
+export function replayStatistics(dates: string[], dailyReturns: number[], totalReturn: number, payload?: MarketPayload) {
   const years = (Date.parse(dates.at(-1) ?? "") - Date.parse(dates[0] ?? "")) / (365.25 * 86400000);
   const annualReturn = years > 0 && totalReturn > -1 ? (1 + totalReturn) ** (1 / years) - 1 : null;
   const mean = dailyReturns.reduce((sum, value) => sum + value, 0) / Math.max(dailyReturns.length, 1);
   const variance = dailyReturns.reduce((sum, value) => sum + (value - mean) ** 2, 0) / Math.max(dailyReturns.length - 1, 1);
-  return { annualReturn, sharpe: variance > 1e-16 ? Math.sqrt(252) * mean / Math.sqrt(variance) : null };
+  return { annualReturn, sharpe: historicalSharpe(dates, dailyReturns, payload) };
 }
 
 export function allocationAttributionEffects(current: FactorModelAnalytics, alternative: FactorModelAnalytics) {

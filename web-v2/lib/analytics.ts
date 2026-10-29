@@ -1,3 +1,4 @@
+import { historicalSharpe } from "./historical-sharpe.ts";
 import { solveConstrainedRiskAllocation } from "./risk-allocation.ts";
 import { summarizeCovariance, type CovarianceSnapshot, type CovarianceReference } from "./covariance-comparison.ts";
 
@@ -84,9 +85,9 @@ export type StrategyBacktestAnalytics = {
   benchmarkReturn: number;
   annualVolatility: number;
   beta: number;
-  sharpeRatio: number;
-  staticSharpeRatio: number;
-  benchmarkSharpeRatio: number;
+  sharpeRatio: number | null;
+  staticSharpeRatio: number | null;
+  benchmarkSharpeRatio: number | null;
   maxDrawdown: number;
   totalTurnover: number;
   transactionCosts: number;
@@ -115,6 +116,8 @@ export type StrategyBacktestAnalytics = {
   };
 };
 export type CovarianceForecastAnalytics = CovarianceSnapshot & {
+  modelLabel?: string;
+  shrinkage?: number;
   asOf: string;
   horizon: "Next trading session";
   observations: number;
@@ -190,7 +193,7 @@ export type SecurityDrilldownAnalytics = {
   decomposition: SecurityDecomposition;
 };
 
-const factorDefs: { name: string; group: FactorAnalytics["group"]; long: string; short?: string }[] = [
+export const factorDefs: { name: string; group: FactorAnalytics["group"]; long: string; short?: string }[] = [
   { name: "Market", group: "Core", long: "SPY" },
   { name: "Size", group: "Style", long: "IWM", short: "SPY" },
   { name: "Value", group: "Style", long: "IWD", short: "IWF" },
@@ -359,11 +362,6 @@ function projectStrategyWeights(weights: number[], maxPosition: number) {
 function strategyPortfolioVolatility(weights: number[], covarianceMatrix: number[][]) {
   const varianceEstimate = weights.reduce((sum, weight, row) => sum + weight * covarianceMatrix[row].reduce((rowSum, value, column) => rowSum + value * weights[column], 0), 0);
   return Math.sqrt(Math.max(varianceEstimate, 0));
-}
-
-function annualizedSharpe(dailyReturns: number[]) {
-  const dailyVolatility = Math.sqrt(variance(dailyReturns));
-  return dailyVolatility > 1e-12 ? mean(dailyReturns) / dailyVolatility * Math.sqrt(252) : 0;
 }
 
 const cmIewmaPairs = [[10, 21], [21, 63], [63, 125], [125, 250], [250, 500]] as const;
@@ -816,9 +814,9 @@ export function buildRiskTargetStrategy(payload: MarketPayload, holdings: Analyt
     benchmarkReturn: benchmarkCurve.at(-1)! - 1,
     annualVolatility,
     beta: realizedBeta,
-    sharpeRatio: annualizedSharpe(dailyStrategyReturns),
-    staticSharpeRatio: annualizedSharpe(staticDailyReturns),
-    benchmarkSharpeRatio: annualizedSharpe(dailyBenchmarkReturns),
+    sharpeRatio: historicalSharpe(dates, dailyStrategyReturns, payload),
+    staticSharpeRatio: historicalSharpe(dates, staticDailyReturns, payload),
+    benchmarkSharpeRatio: historicalSharpe(dates, dailyBenchmarkReturns, payload),
     maxDrawdown: maxDrawdown(curve),
     totalTurnover,
     transactionCosts,

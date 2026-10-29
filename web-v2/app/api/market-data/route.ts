@@ -35,6 +35,8 @@ async function loadSymbol(requested: string, period1: Date, period2: Date): Prom
     throw new Error("Distribution-adjusted fund history is unavailable; unadjusted NAV would misstate total returns.");
   }
 
+  if (requested === "BIL" && result.quotes.some(q => Number.isFinite(q.close) && !Number.isFinite(q.adjclose))) throw new Error("Adjusted cash benchmark history is unavailable.");
+
   const points = result.quotes
     .map((quote) => ({
       date: quote.date.toISOString().slice(0, 10),
@@ -62,7 +64,7 @@ export async function POST(request: Request) {
     try { holdings = validateMarketTickers(body.tickers); }
     catch (error) { return Response.json({ error: error instanceof Error ? error.message : "Invalid data request." }, { status: 400 }); }
 
-    const unique = [...new Set([...holdings, ...FACTOR_SYMBOLS])];
+    const unique = [...new Set([...holdings, ...FACTOR_SYMBOLS, "BIL"])];
 
     const years = Math.max(3, Math.min(10, Number(body.years) || 3));
     const period2 = new Date();

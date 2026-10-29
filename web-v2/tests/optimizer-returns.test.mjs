@@ -3,23 +3,23 @@ import assert from "node:assert/strict";
 import { buildOptimizerReturns } from "../lib/optimizer-returns.ts";
 import { optimizePortfolio } from "../lib/portfolio-optimizer.ts";
 
-const input = { tickers: ["AAA", "BBB", "CCC"], current: [.6, -.2, 0], mode: "Idiosyncratic volatility proportionate", level: 5, side: "both", idiosyncraticVolatility: [.1, .2, .3] };
+const input = { tickers: ["AAA", "BBB", "CCC"], current: [.6, -.2, 0], mode: "Idiosyncratic volatility proportionate", side: "both", idiosyncraticVolatility: [.1, .2, .3] };
 const close = (a, b) => assert.ok(Math.abs(a - b) < 1e-10, `${a} != ${b}`);
 test("risk-proportionate preset preserves relative residual risk and explicitly signed views", () => {
   const values = buildOptimizerReturns(input);
-  values.forEach((value, i) => close(value, [.025, -.05, .075][i]));
-  close(values.reduce((s, v) => s + Math.abs(v), 0) / 3, .05);
+  values.forEach((value, i) => close(value, [.5, -1, 1.5][i]));
+  close(values.reduce((s, v) => s + Math.abs(v), 0) / 3, 1);
   assert.ok(buildOptimizerReturns({ ...input, side: "short" }).every(v => v < 0));
   assert.ok(buildOptimizerReturns({ ...input, side: "long" }).every(v => v > 0));
 });
-test("equal-return assumptions and zero overrides are independent of risk availability", () => {
-  assert.deepEqual(buildOptimizerReturns({ ...input, mode: "Equal expected returns", idiosyncraticVolatility: [], overrides: { AAA: "0", BBB: "3" } }), [0, .03, .05]);
+test("relative preferences ignore percentage overrides and require no return scale", () => {
+  assert.deepEqual(buildOptimizerReturns({ ...input, mode: "Equal preferences", idiosyncraticVolatility: [], overrides: { AAA: "0", BBB: "3" } }), [1, -1, 1]);
 });
 test("manual mode preserves legacy values and blank-as-zero behavior", () => {
   assert.deepEqual(buildOptimizerReturns({ ...input, mode: "Manual forecasts", level: NaN, overrides: { AAA: "7", BBB: "-4" } }), [.07, -.04, 0]);
 });
 test("unavailable risk and invalid assumptions fail explicitly instead of generating silent forecasts", () => {
-  for (const patch of [{ idiosyncraticVolatility: [] }, { idiosyncraticVolatility: [0, 0, 0] }, { level: 0 }, { level: NaN }, { overrides: { AAA: "invalid" } }]) assert.throws(() => buildOptimizerReturns({ ...input, ...patch }));
+  for (const patch of [{ idiosyncraticVolatility: [] }, { idiosyncraticVolatility: [0, 0, 0] }, { mode: "Manual forecasts", overrides: { AAA: "invalid" } }]) assert.throws(() => buildOptimizerReturns({ ...input, ...patch }));
 });
 test("preset feeds Sharpe optimization without individual forecasts, including short-only books", () => {
   for (const shortOnly of [false, true]) {

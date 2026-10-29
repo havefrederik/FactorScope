@@ -383,6 +383,7 @@ function StrategyAnalysis(props: StrategyWorkspaceProps) {
 export default function Home() {
   const [view, setView] = useState<View>("Overview");
   const [csvGuideNavigation, setCsvGuideNavigation] = useState(0);
+  useEffect(()=>{const open=()=>{setView("Methodology");requestAnimationFrame(()=>document.getElementById("about-models")?.scrollIntoView({block:"start"}));};window.addEventListener("factorscope-open-about",open);return()=>window.removeEventListener("factorscope-open-about",open);},[]);
   const [csvUploadOpen, setCsvUploadOpen] = useState(false);
   function openCsvGuide() {
     window.history.replaceState(null, "", "#about-csv");

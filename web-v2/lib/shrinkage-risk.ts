@@ -1,6 +1,6 @@
 import { factorDefs, type MarketPayload, type CovarianceForecastAnalytics } from './analytics.ts';
 import { summarizeCovariance } from './covariance-comparison.ts';
-export const riskEstimators = ['CM-IEWMA', 'Ledoit–Wolf', 'ETF proxies + residual PCA'] as const;
+export const riskEstimators = ['SEC fundamentals + residual PCA', 'Fama–French 5 + momentum', 'CM-IEWMA', 'Ledoit–Wolf', 'ETF proxies + residual PCA'] as const;
 export type RiskEstimator = typeof riskEstimators[number];
 const dot=(a:number[],b:number[])=>a.reduce((s,v,i)=>s+v*b[i],0);
 const centered=(x:number[])=>{const m=x.reduce((s,v)=>s+v,0)/x.length;return x.map(v=>v-m)};
@@ -62,6 +62,7 @@ export function hybridRisk(returns:number[][], observedFactors:number[][], selec
 }
 
 export function alternativeRisk(payload:MarketPayload,base:CovarianceForecastAnalytics,weights:number[],mode:RiskEstimator,selected:number[]){
+  if(mode==='SEC fundamentals + residual PCA'||mode==='Fama–French 5 + momentum')throw Error('This model requires its dated external data.');
   if(mode==='CM-IEWMA')return {forecast:base,components:[] as ReturnType<typeof hybridRisk>['components']};
   const symbols=[...new Set([...base.tickers,...(mode==='ETF proxies + residual PCA'?factorDefs.flatMap(f=>[f.long,...(f.short?[f.short]:[])]):[])])];
   const maps=new Map(symbols.map(t=>[t,new Map(payload.series[t]?.points.filter(p=>p.date<=base.asOf).map(p=>[p.date,p.close])??[])]));

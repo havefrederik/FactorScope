@@ -1,6 +1,6 @@
 import { factorDefs, type MarketPayload, type CovarianceForecastAnalytics } from './analytics.ts';
 import { summarizeCovariance } from './covariance-comparison.ts';
-export const riskEstimators = ['Ledoit–Wolf', 'SEC fundamentals + residual PCA', 'Fama–French 5 + momentum', 'CM-IEWMA', 'ETF proxies + residual PCA'] as const;
+export const riskEstimators = ['Ledoit–Wolf', 'Fundamental factors', 'Fama–French 5 + momentum', 'CM-IEWMA', 'ETF proxies + residual PCA'] as const;
 export type RiskEstimator = typeof riskEstimators[number];
 const dot=(a:number[],b:number[])=>a.reduce((s,v,i)=>s+v*b[i],0);
 const centered=(x:number[])=>{const m=x.reduce((s,v)=>s+v,0)/x.length;return x.map(v=>v-m)};
@@ -45,7 +45,7 @@ export function principalComponents(matrix:number[][]){
 
 /** Reorthogonalized projection onto observed factor span, including intercept.
  * Redundant proxy columns are omitted, rather than destabilizing an inverse. */
-export function hybridRisk(returns:number[][], observedFactors:number[][], selected:number[]){
+export function hybridRisk(returns:number[][], observedFactors:number[][], selected:number[],shrinkageOverride:number|null=null){
   const x=returns.map(centered),n=x[0].length,basis:number[][]=[];
   for(const raw of observedFactors){let u=centered(raw);const initial=dot(u,u);
     for(let pass=0;pass<2;pass++)for(const q of basis){const b=dot(u,q);u=u.map((v,i)=>v-b*q[i]);}
@@ -58,13 +58,13 @@ export function hybridRisk(returns:number[][], observedFactors:number[][], selec
   const common=fitted.map(r=>[...r]);
   for(const k of selected){const c=components[k];const score=Array.from({length:n},(_,t)=>residual.reduce((s,r,i)=>s+c.vector[i]*r[t],0));common.forEach((r,i)=>r.forEach((_,t)=>r[t]+=c.vector[i]*score[t]));}
   const remaining=x.map((r,i)=>r.map((v,t)=>v-common[i][t]));
-  const lw=ledoitWolf(remaining),commonCov=covariance(common);
-  return {covariance:commonCov.map((r,i)=>r.map((v,j)=>v+lw.covariance[i][j])),shrinkage:lw.shrinkage,rank:basis.length,
-    components:components.map((c,k)=>({name:`Residual PC${k+1}`,group:'Residual statistical',values:c.vector.map(v=>100*v*Math.sqrt(c.variance)),unit:'pp per daily 1σ factor move',variance:c.variance}))};
+  const lw=ledoitWolf(remaining,shrinkageOverride),commonCov=covariance(common);
+  return {covariance:commonCov.map((r,i)=>r.map((v,j)=>v+lw.covariance[i][j])),shrinkage:lw.shrinkage,specificVolatility:remaining.map(r=>Math.sqrt(252*dot(r,r)/n)),rank:basis.length,
+    components:components.map((c,k)=>({name:`F${k+1}`,group:'Residual statistical',values:c.vector.map(v=>100*v*Math.sqrt(c.variance)),unit:'pp per daily 1σ factor move',variance:c.variance}))};
 }
 
-export function alternativeRisk(payload:MarketPayload,base:CovarianceForecastAnalytics,weights:number[],mode:RiskEstimator,selected:number[],shrinkageOverride:number|null=null){
-  if(mode==='SEC fundamentals + residual PCA'||mode==='Fama–French 5 + momentum')throw Error('This model requires its dated external data.');
+export function alternativeRisk(payload:MarketPayload,base:CovarianceForecastAnalytics,weights:number[],mode:RiskEstimator,selected:number[],shrinkageOverride:number|null=null,namedSelection?:number[]){
+  if(mode==='Fundamental factors'||mode==='Fama–French 5 + momentum')throw Error('This model requires its dated external data.');
   if(mode==='CM-IEWMA')return {forecast:base,components:[] as ReturnType<typeof hybridRisk>['components']};
   const symbols=[...new Set([...base.tickers,...(mode==='ETF proxies + residual PCA'?factorDefs.flatMap(f=>[f.long,...(f.short?[f.short]:[])]):[])])];
   const maps=new Map(symbols.map(t=>[t,new Map(payload.series[t]?.points.filter(p=>p.date<=base.asOf).map(p=>[p.date,p.close])??[])]));
@@ -72,7 +72,7 @@ export function alternativeRisk(payload:MarketPayload,base:CovarianceForecastAna
   if(dates.length<253||dates.at(-1)!==base.asOf)throw Error('This risk model requires 252 aligned daily returns through the decision date.');
   const series=new Map(symbols.map(t=>[t,dates.slice(1).map((d,i)=>maps.get(t)!.get(d)!/maps.get(t)!.get(dates[i])!-1)]));
   const assets=base.tickers.map(t=>series.get(t)!);
-  const estimate=mode==='Ledoit–Wolf'?{...ledoitWolf(assets,shrinkageOverride),components:[] as ReturnType<typeof hybridRisk>['components']}:hybridRisk(assets,factorDefs.map(f=>series.get(f.long)!.map((v,i)=>v-(f.short?series.get(f.short)![i]:0))),selected);
+  const estimate=mode==='Ledoit–Wolf'?{...ledoitWolf(assets,shrinkageOverride),components:[] as ReturnType<typeof hybridRisk>['components']}:hybridRisk(assets,factorDefs.filter((_,i)=>namedSelection===undefined||namedSelection.includes(i)).map(f=>series.get(f.long)!.map((v,i)=>v-(f.short?series.get(f.short)![i]:0))),selected,shrinkageOverride);
   const matrix=estimate.covariance.map(r=>r.map(v=>252*v));
   return {forecast:{...base,...summarizeCovariance(matrix,base.tickers,weights),observations:252,expertWeights:[],modelLabel:mode==='Ledoit–Wolf'?(shrinkageOverride===null?'Ledoit–Wolf · automatic shrinkage':'Manual shrinkage · scaled identity'):`ETF proxies + ${selected.length} residual PCs · residual Ledoit–Wolf`,shrinkage:estimate.shrinkage},components:estimate.components};
 }

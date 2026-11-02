@@ -1,6 +1,6 @@
 "use client";
 import { useMemo, useState, type ReactNode } from "react";
-import { buildPortfolioDecomposition, type MarketPayload, type PortfolioAnalytics, type SecurityDecomposition } from "@/lib/analytics";
+import { buildPortfolioDecomposition, type MarketPayload, type SecurityDecomposition } from "@/lib/analytics";
 import type { ExamplePortfolioResult } from "@/lib/example-portfolio";
 import { buildPortfolioGroups, type PortfolioGrouping } from "@/lib/portfolio-groups";
 import GroupReturnsChart, { groupStyle } from "./group-returns-chart";
@@ -8,10 +8,10 @@ import PortfolioHoldings from "./portfolio-holdings";
 
 const money=(n:number)=>new Intl.NumberFormat("en-US",{style:"currency",currency:"USD",maximumFractionDigits:0}).format(n);
 const pct=(n:number)=>`${(100*n).toFixed(2)}%`;
-export default function ExamplePortfolio({payload,example,sectors,firstMonth,setFirstMonth,cost,setCost,selectedDate,setSelectedDate,onSelectTicker,renderPerformance,renderDecomposition,portfolioName="US Equity Portfolio",isAI=false}:{portfolioName?:string;isAI?:boolean;payload:MarketPayload;example:ExamplePortfolioResult;sectors:Record<string,string>;firstMonth:string;setFirstMonth:(value:string)=>void;cost:number;setCost:(value:number)=>void;selectedDate:string;setSelectedDate:(value:string)=>void;onSelectTicker:(ticker:string)=>void;renderPerformance:(analytics:PortfolioAnalytics)=>ReactNode;renderDecomposition:(decomposition:SecurityDecomposition)=>ReactNode}){
+export default function ExamplePortfolio({payload,example,sectors,firstMonth,setFirstMonth,cost,setCost,selectedDate,setSelectedDate,onSelectTicker,renderDecomposition,portfolioName="US Equity Portfolio",isAI=false}:{portfolioName?:string;isAI?:boolean;payload:MarketPayload;example:ExamplePortfolioResult;sectors:Record<string,string>;firstMonth:string;setFirstMonth:(value:string)=>void;cost:number;setCost:(value:number)=>void;selectedDate:string;setSelectedDate:(value:string)=>void;onSelectTicker:(ticker:string)=>void;renderDecomposition:(decomposition:SecurityDecomposition)=>ReactNode}){
   const end=payload.asOf??"";
   const decomposition=useMemo(()=>example?buildPortfolioDecomposition(payload,example.analytics):null,[payload,example]);
-  const [chartView,setChartView]=useState<"Attribution"|"Returns by group"|"Performance">("Attribution");
+  const [chartView,setChartView]=useState<"Attribution"|"Returns by group">("Attribution");
   const [grouping,setGrouping]=useState<PortfolioGrouping>("Stocks");
   const grouped=useMemo(()=>buildPortfolioGroups(payload,example,sectors,grouping),[payload,example,sectors,grouping]);
   const [selectedGroup,setSelectedGroup]=useState<string|null>(null);
@@ -20,31 +20,18 @@ export default function ExamplePortfolio({payload,example,sectors,firstMonth,set
   function selectGroup(name:string|null){setSelectedGroup(name);setChartView("Returns by group");}
   const positions=[...example.tickers.map((ticker,i)=>({ticker,sector:sectors[ticker]??"Unclassified",value:day.values[i]})).filter(row=>row.value!==0||(rebalance?.targets[example.tickers.indexOf(row.ticker)]??0)!==0),{ticker:"CASH",sector:"Cash",value:day.cash}];
   const allocation=rebalance?{date:rebalance.date,weights:Object.fromEntries(example.tickers.map((ticker,i)=>[ticker,rebalance.targets[i]]))}:undefined;
-  function download(){
-    if(!example)return;
-    const lines=["date,ticker,value_usd,weight,target_weight,rebalance_month,portfolio_type"];
-    for(const d of example.days){const reb=example.rebalances[d.rebalance];example.tickers.forEach((ticker,j)=>{if(d.values[j]||reb?.targets[j])lines.push([d.date,ticker,d.values[j],d.values[j]/d.nav,reb?.targets[j]??0,reb?.month??"",portfolioName].join(","));});lines.push([d.date,"CASH",d.cash,d.cash/d.nav,1-(reb?.targets.reduce((a,b)=>a+b,0)??0),reb?.month??"",portfolioName].join(","));}
-    const url=URL.createObjectURL(new Blob([lines.join("\n")],{type:"text/csv"}));const a=document.createElement("a");a.href=url;a.download=`${portfolioName.toLowerCase().replace(/[^a-z0-9]+/g,"-")}-daily-holdings.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
-  }
   return <div className="published-dow example-portfolio">
-    <header className="example-summary-head">
-      <div className="example-title-block"><h1 className="sr-only">Portfolio overview</h1><span className="example-period">{example.analytics.startDate} — {example.analytics.endDate}</span></div>
-      <div className="example-summary-actions">
-        <details className="example-settings"><summary>Period</summary><div className="example-settings-body"><div className="example-controls"><label>First month<input aria-label="Portfolio first month" type="month" value={firstMonth} max={end.slice(0,7)} onChange={e=>e.target.value&&setFirstMonth(e.target.value)}/></label></div></div></details>
-        <button className="example-export" onClick={download} aria-label="Download daily holdings CSV">Export holdings ↓</button>
-      </div>
-    </header>
+    <h1 className="sr-only">Portfolio overview</h1>
     <div className="portfolio-overview-grid">
       <div className="portfolio-chart-stack">
         <section className="panel example-chart overview-main-chart">
           <div className="portfolio-chart-tabs" role="tablist" aria-label="Portfolio charts">
-            {(["Attribution","Returns by group","Performance"] as const).map(tab=><button key={tab} role="tab" aria-selected={chartView===tab} className={chartView===tab?"active":""} onClick={()=>{setChartView(tab);if(tab==="Returns by group"&&chartView!=="Returns by group"){setGrouping("Sectors");setSelectedGroup(null);}}}>{tab}</button>)}
-            <span>{chartView==="Attribution"?"Factor & idiosyncratic return":chartView==="Returns by group"?`${grouping} · gross returns`:"Portfolio vs. S&P 500"}</span>
+            {(["Attribution","Returns by group"] as const).map(tab=><button key={tab} role="tab" aria-selected={chartView===tab} className={chartView===tab?"active":""} onClick={()=>{setChartView(tab);if(tab==="Returns by group"&&chartView!=="Returns by group"){setGrouping("Sectors");setSelectedGroup(null);}}}>{tab}</button>)}
+            <details className="example-settings chart-period"><summary aria-label="Choose portfolio period">Period <span>{example.analytics.startDate} — {example.analytics.endDate}</span></summary><div className="example-settings-body"><div className="example-controls"><label>First month<input aria-label="Portfolio first month" type="month" value={firstMonth} max={end.slice(0,7)} onChange={e=>e.target.value&&setFirstMonth(e.target.value)}/></label></div></div></details>
           </div>
           <div className={chartView==="Attribution"?"portfolio-chart-content overview-decomposition":"portfolio-chart-content"} role="tabpanel" aria-label={chartView}>
             {chartView==="Attribution"&&(decomposition?renderDecomposition(decomposition):<p className="archive-table-note">Factor history is incomplete for this period. Choose a more recent starting month.</p>)}
             {chartView==="Returns by group"&&<><div className="holdings-grouping" aria-label="Group chart and holdings">{(["Stocks","Sectors",...(example.days.some(d=>d.values.some(v=>v<0))?["Long / short"]:[])] as PortfolioGrouping[]).map(mode=><button key={mode} className={grouping===mode?"active":""} aria-pressed={grouping===mode} onClick={()=>{setGrouping(mode);setSelectedGroup(null);}}>{mode}</button>)}</div><GroupReturnsChart dates={grouped.dates} groups={grouped.groups} selectedGroup={selectedGroup} onSelectGroup={selectGroup} selectedDate={day.date} onSelectDate={setSelectedDate}/></>}
-            {chartView==="Performance"&&renderPerformance(example.analytics)}
           </div>
         </section>
       </div>

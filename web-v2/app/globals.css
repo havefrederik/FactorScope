@@ -770,3 +770,25 @@
 @media(max-width:760px){.decomposition-legend{width:235px}.decomposition-series-toggle{grid-template-columns:6px minmax(0,1fr) auto 54px 10px;gap:5px;padding:2px 0}.compact-page-head{align-items:flex-start}.overview-main-chart .line-chart{height:290px}}
 .decomposition-legend{max-height:calc(100% - 28px);overflow-y:auto;scrollbar-width:thin;scrollbar-color:#555a50 transparent}
 .decomposition-legend .decomposition-series-toggle{height:16px;min-height:0;padding:1px 0;line-height:12px}
+
+/* Keep scope controls beside their content rather than in an empty heading row. */
+.workspace{padding-top:12px}
+.toolbar-dates:empty{display:none}
+.toolbar-dates .date-control{gap:5px;flex-wrap:nowrap}
+.toolbar-dates .date-control>span,.toolbar-dates .date-control label small{display:none}
+.toolbar-dates .date-control label{padding:5px 6px;border-radius:4px}
+.toolbar-dates .date-control input{font-size:10px;min-width:104px;width:104px}
+.portfolio-toolbar{flex-wrap:wrap;gap:10px}
+.chart-period{margin-left:auto}
+.chart-period summary{display:flex;align-items:center;gap:10px;padding:5px 9px;list-style:none}
+.chart-period summary:after{content:'⌄';color:var(--muted)}
+.chart-period summary span{font-size:9px;color:var(--muted)}
+.chart-period .example-settings-body{right:0}
+.compact-page-head{display:none}
+@media(max-width:1050px){.toolbar-holdings{display:none}.toolbar-dates .date-control input{width:96px;min-width:96px}}
+@media(max-width:760px){.toolbar-dates .date-control{display:flex;width:auto}.chart-period summary span{display:none}.chart-period .example-settings-body{right:0;max-width:calc(100vw - 40px)}.workspace{padding-top:10px}.portfolio-tools{width:auto;flex-wrap:wrap}.portfolio-toolbar .toolbar-value{margin-left:auto}}
+.optimizer-factor-selection h4{font-size:12px;margin:0 0 10px;color:var(--text)}
+.factor-checkbox-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:7px 14px}
+.optimizer-factor-selection .factor-checkbox-grid label{font-size:11px;margin:0;display:flex;gap:6px;align-items:center}
+.optimizer-backtest fieldset{border:0;margin:0}.optimizer-backtest summary{font-weight:600}
+.strategy-decision-scroll{max-height:320px;overflow:auto}.strategy-decision-scroll table{width:100%;font-size:11px;text-align:left}

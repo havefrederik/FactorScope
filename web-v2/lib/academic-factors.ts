@@ -26,7 +26,7 @@ export function timeSeriesExposures(assets:number[][],factors:number[][]){
  }
  return assets.map(raw=>{const y=center(raw),b=Q.map(q=>dot(q,y));for(let i=b.length-1;i>=0;i--){for(let j=i+1;j<b.length;j++)b[i]-=R[i][j]*b[j];b[i]/=R[i][i];}return b;});
 }
-export function academicRisk(payload:MarketPayload,base:CovarianceForecastAnalytics,weights:number[],data:AcademicFactors){
+export function academicRisk(payload:MarketPayload,base:CovarianceForecastAnalytics,weights:number[],data:AcademicFactors,namedSelection:number[]=data.names.map((_,i)=>i),selected:number[]=[],shrinkageOverride:number|null=null){
  if(base.asOf>data.through)throw Error(`French factors end on ${data.through}. Choose that date or earlier.`);
  const rows=data.rows.filter(r=>r.date<=base.asOf).slice(-252),stocks=base.tickers.map(t=>payload.series[t]?.points??[]);
  if(rows.length!==252||rows.at(-1)!.date!==base.asOf)throw Error('Need 252 matching French factor sessions.');
@@ -34,8 +34,9 @@ export function academicRisk(payload:MarketPayload,base:CovarianceForecastAnalyt
   const previous=points[i-1].date,priorFactor=data.rows.findIndex(v=>v.date===r.date)-1;
   if(priorFactor<0||data.rows[priorFactor].date!==previous)throw Error('Stock return interval crosses a missing French session.');
   return points[i].close/points[i-1].close-1-r.rf;});});
- const f=data.names.map((_,k)=>rows.map(r=>r.values[k])),betas=timeSeriesExposures(assets,f),fit=hybridRisk(assets,f,[]),matrix=fit.covariance.map(r=>r.map(v=>252*v));
- const specificVolatility=assets.map((x,i)=>{const residual=x.map((v,t)=>v-f.reduce((s,q,k)=>s+betas[i][k]*q[t],0)),mean=residual.reduce((s,v)=>s+v,0)/residual.length;return Math.sqrt(252*residual.reduce((s,v)=>s+(v-mean)**2,0)/residual.length)});
- return {forecast:{...base,...summarizeCovariance(matrix,base.tickers,weights),observations:252,expertWeights:[],modelLabel:'Fama–French 5 + momentum · residual Ledoit–Wolf',shrinkage:fit.shrinkage},components:[],specificVolatility,
-  factors:data.names.map((name,k)=>({name:`French: ${name}`,group:k===0?'Core':'Style',unit:'time-series beta',asOf:base.asOf,values:betas.map(b=>b[k])}))};
+ if(new Set(namedSelection).size!==namedSelection.length||namedSelection.some(i=>!Number.isInteger(i)||i<0||i>=data.names.length))throw Error('Choose available academic factors.');
+ const f=namedSelection.map(k=>rows.map(r=>r.values[k])),betas=timeSeriesExposures(assets,f),fit=hybridRisk(assets,f,selected,shrinkageOverride),matrix=fit.covariance.map(r=>r.map(v=>252*v));
+ const specificVolatility=fit.specificVolatility;
+ return {forecast:{...base,...summarizeCovariance(matrix,base.tickers,weights),observations:252,expertWeights:[],modelLabel:`Fama–French (${namedSelection.length}) + statistical factors (${selected.length}) · residual shrinkage`,shrinkage:fit.shrinkage},components:fit.components,specificVolatility,
+  factors:namedSelection.map((id,k)=>({name:`French: ${data.names[id]}`,group:id===0?'Core':'Style',unit:'time-series beta',asOf:base.asOf,values:betas.map(b=>b[k])}))};
 }

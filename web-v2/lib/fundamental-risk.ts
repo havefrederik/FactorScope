@@ -1,5 +1,6 @@
+import type { RefitPanel } from './fundamental-selection.ts';
 import {ledoitWolf} from './shrinkage-risk.ts';
-export type FundamentalBundle={version:1;kind:'sec-characteristic';asOf:string;universeDate:string;observations:number;referenceCount:number;tickers:string[];stocks:{ticker:string;name:string;sector:string;imputed:string[]}[];factorNames:string[];industryCount:number;industryReference:string;exposures:number[][];factorReturns:number[][];statLoadings:number[][];statReturns:number[][];statVariances:number[];residualCovariance:number[][];gram:number[][];residualProjection:number[][];squaredNorms:number[];covarianceNormSquared:number;loadingCovarianceQuadratic:number[];residualTrace:number;limitations:string[]};
+export type FundamentalBundle={refit?:RefitPanel;factorGroups?:string[];version:1;kind:'sec-characteristic';asOf:string;universeDate:string;observations:number;referenceCount:number;tickers:string[];stocks:{ticker:string;name:string;sector:string;imputed:string[]}[];factorNames:string[];industryCount:number;industryReference:string;exposures:number[][];factorReturns:number[][];statLoadings:number[][];statReturns:number[][];statVariances:number[];residualCovariance:number[][];gram:number[][];residualProjection:number[][];squaredNorms:number[];covarianceNormSquared:number;loadingCovarianceQuadratic:number[];residualTrace:number;limitations:string[]};
 export type FundamentalDisplay={asOf:string;universeDate:string;observations:number;referenceCount:number;modelLabel:string;tickers:string[];covariance:number[][];specificVolatility:number[];factorShrinkage:number;shrinkage:number;factors:{name:string;group:string;unit:string;asOf:string;values:number[]}[];components:{name:string;group:string;unit:string;asOf:string;values:number[]}[];imputed:{ticker:string;characteristics:string[]}[]};
 const dot=(a:number[],b:number[])=>a.reduce((s,v,i)=>s+v*b[i],0);
 export function parseFundamentalBundle(value:unknown):FundamentalBundle{
@@ -11,6 +12,7 @@ export function parseFundamentalBundle(value:unknown):FundamentalBundle{
 }
 /** Joint factor shrinkage in standardized return units; retain cross-factor terms. */
 export function factorCovariance(series:number[][]){
+ if(!series.length)return {shrinkage:0,covariance:[] as number[][]};
  const scales=series.map(x=>{const mean=x.reduce((a,b)=>a+b,0)/x.length;return Math.sqrt(x.reduce((s,v)=>s+(v-mean)**2,0)/x.length)});
  if(scales.some(v=>v<1e-12))throw Error('Degenerate factor history.');
  const fitted=ledoitWolf(series.map((x,i)=>x.map(v=>v/scales[i])));
@@ -31,7 +33,7 @@ export function residualShrinkage(b:FundamentalBundle,selected:number[]){
  const delta=Math.max(0,norm-trace*trace/n),beta=Math.max(0,(fourth-norm)/t);
  return {shrinkage:delta>1e-30?Math.min(1,beta/delta):0,mu:Math.max(0,trace/n)};
 }
-export function fundamentalDisplay(b:FundamentalBundle,tickers:string[],asOf:string,selected:number[]):FundamentalDisplay{
+export function fundamentalDisplay(b:FundamentalBundle,tickers:string[],asOf:string,selected:number[],shrinkageOverride:number|null=null):FundamentalDisplay{
  if(asOf!==b.asOf)throw Error(`Fundamental forecast available for ${b.asOf}. Choose that model date.`);
  if(!Array.isArray(tickers)||!tickers.length||tickers.length>100||tickers.some(t=>typeof t!=='string'||!/^[A-Z][A-Z0-9.-]{0,11}$/.test(t))||new Set(tickers.map(t=>t.replaceAll('-','.'))).size!==tickers.length)throw Error('Supply up to 100 unique stock tickers.');
  if(!Array.isArray(selected)||new Set(selected).size!==selected.length||selected.some(k=>!Number.isInteger(k)||k<0||k>=b.statReturns.length))throw Error('Choose available residual factors.');
@@ -41,15 +43,16 @@ export function fundamentalDisplay(b:FundamentalBundle,tickers:string[],asOf:str
  const B=indices.map(i=>[...b.exposures[i],...selected.map(k=>b.statLoadings[i][k])]);
  const C=B.map(row=>joint.covariance.map(c=>dot(c,row)));
  const shrink=residualShrinkage(b,selected);
+ if(shrinkageOverride!==null){if(!Number.isFinite(shrinkageOverride)||shrinkageOverride<0||shrinkageOverride>1)throw Error('Shrinkage must be between 0% and 100%.');shrink.shrinkage=shrinkageOverride;}
  const specific=indices.map((i,a)=>indices.map((j,c)=>{
   const raw=b.residualCovariance[i][j]-selected.reduce((s,k)=>s+b.statVariances[k]*b.statLoadings[i][k]*b.statLoadings[j][k],0);
   return (1-shrink.shrinkage)*raw+(a===c?shrink.shrinkage*shrink.mu:0);
  }));
  return {asOf:b.asOf,universeDate:b.universeDate,observations:b.observations,referenceCount:b.referenceCount,tickers,
-  modelLabel:`SEC fundamentals + ${selected.length} residual ${selected.length===1?'PC':'PCs'} · Ledoit–Wolf`,
+  modelLabel:`Fundamental factors (${b.factorNames.length}) + statistical factors (${selected.length}) · Ledoit–Wolf`,
   covariance:B.map((r,i)=>B.map((_,j)=>252*(dot(r,C[j])+specific[i][j]))),
   specificVolatility:specific.map((r,i)=>Math.sqrt(Math.max(0,252*r[i]))),factorShrinkage:joint.shrinkage,shrinkage:shrink.shrinkage,
-  factors:b.factorNames.map((name,k)=>({name,group:k===0?'Core':k<=b.industryCount?'Sector':'Style',unit:k===0?'unit exposure':k<=b.industryCount?'SIC contrast':'characteristic z-score',asOf:b.asOf,values:indices.map(i=>b.exposures[i][k])})),
-  components:b.statReturns.map((_,k)=>({name:`Fundamental residual PC${k+1}`,group:'Residual statistical',unit:'pp per daily 1σ factor move',asOf:b.asOf,values:indices.map(i=>100*b.statLoadings[i][k]*Math.sqrt(b.statVariances[k]))})),
+  factors:b.factorNames.map((name,k)=>({name:name.replace(/^Fundamental: /,'').replace(/^Fundamental market$/,'Market').replace(/^SIC: /,'Industry: '),group:b.factorGroups?.[k]??(k===0?'Core':k<=b.industryCount?'Sector':'Style'),unit:'characteristic exposure',asOf:b.asOf,values:indices.map(i=>b.exposures[i][k])})),
+  components:b.statReturns.map((_,k)=>({name:`F${k+1}`,group:'Residual statistical',unit:'pp per daily 1σ factor move',asOf:b.asOf,values:indices.map(i=>100*b.statLoadings[i][k]*Math.sqrt(b.statVariances[k]))})),
   imputed:indices.filter(i=>b.stocks[i].imputed.length).map(i=>({ticker:b.tickers[i],characteristics:b.stocks[i].imputed}))};
 }

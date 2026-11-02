@@ -3,7 +3,7 @@
 Requires numpy. Current-universe forecast, NOT a survivorship-free backtest.
 SEC facts are selected by filing availability, never period-end alone.
 """
-import json, sys, math
+import base64, json, sys, math
 from pathlib import Path
 from datetime import date, timedelta
 import numpy as np
@@ -103,6 +103,7 @@ def build(directory, output):
     cashmap={p['date']:p['adjusted'] for p in price('BIL')['points']}
     if any(d not in cashmap for d in calendar):raise ValueError('Missing cash benchmark')
     cash=np.array([cashmap[calendar[i+1]]/cashmap[calendar[i]]-1 for i in range(len(calendar)-1)])
+    designs=[];outcomes=[];weight_history=[]
     ff=[];ee=[]; missing_history=[]; final_raw=[]; final_missing=[]; final_provenance=[]
     # Lag every descriptor and volatility weight relative to the modeled return.
     for i in range(252,505):
@@ -116,6 +117,7 @@ def build(directory, output):
         sqrtw=1/np.clip(trailing,lo,hi); X=B[estimation]*sqrtw[estimation,None]
         y=(daily[:,i]-cash[i]); f,_,rank,_=np.linalg.lstsq(X,y[estimation]*sqrtw[estimation],rcond=1e-10)
         if rank<k:raise ValueError('Fundamental exposure design is rank deficient')
+        designs.append(B);outcomes.append(y);weight_history.append(sqrtw)
         ff.append(f);ee.append(y-B@f);missing_history.append(missing.mean(axis=0).tolist())
     F=np.array(ff);E=np.array(ee);E-=E.mean(axis=0);T=len(E)
     sigma=np.maximum(E.std(axis=0),1e-5)
@@ -135,7 +137,8 @@ def build(directory, output):
             'imputed':[STYLES[q] for q,v in enumerate(final_missing[j]) if v],
             'rawCharacteristics':dict(zip(STYLES,final_raw[j])),'filings':final_provenance[j]})
     # Strict JSON: imputed inputs are null, never NaN.
-    result={'version':1,'kind':'sec-characteristic','asOf':asof,'universeDate':u['asOf'],'observations':T,
+    def packed(x):return base64.b64encode(np.asarray(x,dtype='<f4').tobytes()).decode('ascii')
+    result={'refit':{'designs':packed(designs),'outcomes':packed(outcomes),'weights':packed(weight_history),'reference':np.flatnonzero(estimation).tolist()},'version':1,'kind':'sec-characteristic','asOf':asof,'universeDate':u['asOf'],'observations':T,
         'referenceCount':int(estimation.sum()),'tickers':[r['ticker'] for r in rows], 'stocks':stock_info,
         'factorNames':factor_names,'industryCount':len(groups)-1,'industryReference':groups[-1],
         'exposures':latest.tolist(),'factorReturns':F.T.tolist(),'statLoadings':A.tolist(),'statReturns':S.T.tolist(),

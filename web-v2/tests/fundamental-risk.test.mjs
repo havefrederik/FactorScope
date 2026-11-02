@@ -37,3 +37,17 @@ test('API keeps bundle private, authenticates updates and returns only requested
  const r=await api(new Request('https://test/api',{method:'POST',headers:{Origin:'https://factor-scope.vercel.app'},body:JSON.stringify({tickers:['X0'],asOf:b.asOf,selected:[1]})}));
  assert.equal(r.status,200);const display=await r.json();assert.deepEqual(display.tickers,['X0']);assert.equal(display.factorReturns,undefined);assert.equal(display.residualCovariance,undefined);
 });
+
+test('named-factor selection refits the cross-section and retains omitted risk in new residual PCs',async()=>{
+ const {selectFundamentalFactors}=await import('../lib/fundamental-selection.ts');
+ const pack=x=>Buffer.from(new Float32Array(x.flat(Infinity)).buffer).toString('base64');
+ const outcomes=Array.from({length:t},(_,d)=>Array.from({length:n},(_,i)=>dot(b.exposures[i],b.factorReturns.map(f=>f[d]))+E[i][d]));
+ const panel={...b,refit:{reference:Array.from({length:n},(_,i)=>i),designs:pack(Array.from({length:t},()=>b.exposures)),outcomes:pack(outcomes),weights:pack(Array.from({length:t},()=>Array(n).fill(1)))}};
+ const reduced=selectFundamentalFactors(panel,[0]);assert.deepEqual(reduced.factorNames,['Fundamental market']);assert.equal(reduced.factorGroups[0],'Core');
+ for(let d=0;d<t;d++){const mean=outcomes[d].reduce((s,v)=>s+v,0)/n;assert.ok(Math.abs(reduced.factorReturns[0][d]-mean)<1e-8);}
+ const none=selectFundamentalFactors(panel,[]);assert.equal(none.factorReturns.length,0);
+ const a=fundamentalDisplay(none,['X0','X1'],b.asOf,[]),c=fundamentalDisplay(reduced,['X0','X1'],b.asOf,[0]);
+ assert.ok(a.covariance[0][0]>0);assert.notDeepEqual(a.covariance,c.covariance);
+ assert.throws(()=>selectFundamentalFactors(panel,[999]));assert.throws(()=>selectFundamentalFactors(b,[0]),/updated private/);
+ assert.throws(()=>fundamentalDisplay(b,['X0'],b.asOf,[],1.5));
+});

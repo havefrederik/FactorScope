@@ -27,7 +27,7 @@ test("security drill-down connects holdings to transparent security analytics", 
   assert.match(decompositionComponent, /const indexes = Array\.from\(\{ length \}, \(_, index\) => index\);/);
   assert.match(decompositionComponent, /EACH BAR = CUMULATIVE THROUGH DATE/);
   assert.match(decompositionComponent, /Every vertical bar corresponds to one trading day/);
-  assert.match(decompositionComponent, /const orderedComponents = components/);
+  assert.match(decompositionComponent, /const orderedComponents = visibleComponents/);
   assert.match(decompositionComponent, /Math\.abs\(a\.value\) - Math\.abs\(b\.value\)/);
   assert.match(decompositionComponent, /a\.component\.key === "idiosyncratic"/);
   assert.match(decompositionComponent, /idiosyncratic contribution is always the outermost layer/);

@@ -28,7 +28,7 @@ export default function ExamplePortfolio({payload,example,sectors,firstMonth,set
   }
   return <div className="published-dow example-portfolio">
     <header className="example-summary-head">
-      <div className="example-title-block"><h1>Portfolio overview</h1><span className="example-period">{example.analytics.startDate} — {example.analytics.endDate}</span></div>
+      <div className="example-title-block"><h1 className="sr-only">Portfolio overview</h1><span className="example-period">{example.analytics.startDate} — {example.analytics.endDate}</span></div>
       <div className="example-summary-actions">
         <details className="example-settings"><summary>Period</summary><div className="example-settings-body"><div className="example-controls"><label>First month<input aria-label="Portfolio first month" type="month" value={firstMonth} max={end.slice(0,7)} onChange={e=>e.target.value&&setFirstMonth(e.target.value)}/></label></div></div></details>
         <button className="example-export" onClick={download} aria-label="Download daily holdings CSV">Export holdings ↓</button>

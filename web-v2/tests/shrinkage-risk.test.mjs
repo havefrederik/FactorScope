@@ -45,3 +45,25 @@ test('scaled-identity estimator agrees with scikit-learn 1.9.1 reference fixture
  const actual=ledoitWolf(ref.returns);close(actual.shrinkage,ref.shrinkage);
  actual.covariance.forEach((r,i)=>r.forEach((v,j)=>close(v,ref.covariance[i][j])));
 });
+
+test('manual shrinkage endpoints and intermediate blend preserve variance trace',()=>{
+ const sample=covariance(x),mu=sample.reduce((s,r,i)=>s+r[i],0)/sample.length;
+ for(const alpha of [0,.37,1]){
+  const actual=ledoitWolf(x,alpha);assert.equal(actual.shrinkage,alpha);
+  close(actual.automaticShrinkage,ledoitWolf(x).shrinkage);
+  actual.covariance.forEach((r,i)=>r.forEach((v,j)=>close(v,(1-alpha)*sample[i][j]+(i===j?alpha*mu:0))));
+  close(actual.covariance.reduce((s,r,i)=>s+r[i],0),mu*sample.length);
+ }
+ for(const alpha of [-.1,1.1,NaN,Infinity])assert.throws(()=>ledoitWolf(x,alpha),/between 0% and 100%/);
+});
+
+test('manual optimizer covariance applies chosen intensity without using future data',()=>{
+ const dates=Array.from({length:260},(_,i)=>new Date(Date.UTC(2025,0,i+1)).toISOString().slice(0,10));
+ const series=Object.fromEntries(['AAA','BBB'].map((ticker,j)=>{let price=100;return [ticker,{points:dates.map((date,i)=>({date,close:price*=1+.005*Math.sin(i*(j+1)*.21)}))}]}));
+ const base={asOf:dates[252],tickers:['AAA','BBB']},payload={series};
+ const a=alternativeRisk(payload,base,[.5,.5],'Ledoit–Wolf',[],1);
+ assert.equal(a.forecast.shrinkage,1);assert.equal(a.forecast.covarianceMatrix[0][1],0);
+ close(a.forecast.covarianceMatrix[0][0],a.forecast.covarianceMatrix[1][1]);
+ for(const s of Object.values(series))for(const p of s.points)if(p.date>base.asOf)p.close*=10;
+ assert.deepEqual(alternativeRisk(payload,base,[.5,.5],'Ledoit–Wolf',[],1),a);
+});

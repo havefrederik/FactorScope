@@ -81,51 +81,66 @@ function Icon({ name }: { name: string }) {
 
 function PerformanceChart({ portfolio, benchmark, tertiary, dates, startDate, endDate, large = false, primaryLabel = "Current portfolio", secondaryLabel = "S&P 500", tertiaryLabel = "Market reference", definition = "Growth of $1 invested at the start of the period. Current dollar allocations are held buy-and-hold; cash earns 0%." }: { portfolio: number[]; benchmark: number[]; tertiary?: number[]; dates?: string[]; startDate: string; endDate: string; large?: boolean; primaryLabel?: string; secondaryLabel?: string; tertiaryLabel?: string; definition?: string }) {
   const length = Math.min(portfolio.length, benchmark.length, tertiary?.length ?? Number.POSITIVE_INFINITY, dates?.length ?? Number.POSITIVE_INFINITY);
-  const step = Math.max(1, Math.floor(length / 260));
+  const [chartMode,setChartMode]=useState<"return"|"drawdown">("return");
+  const [hoverIndex,setHoverIndex]=useState<number|null>(null);
+  const [hidden,setHidden]=useState<string[]>([]);
+  const visible=(key:string)=>!hidden.includes(key);
+  const toggle=(key:string)=>setHidden(old=>old.includes(key)?old.filter(k=>k!==key):[...old,key]);
+  const toDrawdown=(values:number[])=>{let peak=values[0]??1;return values.map(v=>{peak=Math.max(peak,v);return v/peak;});};
+  const primary=chartMode==="return"?portfolio:toDrawdown(portfolio),secondary=chartMode==="return"?benchmark:toDrawdown(benchmark),third=tertiary?(chartMode==="return"?tertiary:toDrawdown(tertiary)):undefined;
+  const inspected=Math.min(length-1,Math.max(0,hoverIndex??length-1));
+  const step = Math.max(1, 1);
   const indexes = Array.from({ length }, (_, index) => index).filter((index) => index % step === 0 || index === length - 1);
-  const sampledPortfolio = indexes.map((index) => portfolio[index]);
-  const sampledBenchmark = indexes.map((index) => benchmark[index]);
-  const sampledTertiary = tertiary ? indexes.map((index) => tertiary[index]) : [];
-  const rawMin = Math.min(...sampledPortfolio, ...sampledBenchmark, ...sampledTertiary, 1);
-  const rawMax = Math.max(...sampledPortfolio, ...sampledBenchmark, ...sampledTertiary, 1);
+  const sampledPortfolio = indexes.map((index) => primary[index]);
+  const sampledBenchmark = indexes.map((index) => secondary[index]);
+  const sampledTertiary = third ? indexes.map((index) => third[index]) : [];
+  const rawMin = Math.min(...(visible("portfolio")?sampledPortfolio:[]), ...(visible("benchmark")?sampledBenchmark:[]), ...(visible("tertiary")?sampledTertiary:[]), 1);
+  const rawMax = Math.max(...(visible("portfolio")?sampledPortfolio:[]), ...(visible("benchmark")?sampledBenchmark:[]), ...(visible("tertiary")?sampledTertiary:[]), 1);
   const padding = Math.max((rawMax - rawMin) * .08, .02);
   const min = rawMin - padding;
   const max = rawMax + padding;
   const points = (values: number[]) => values.map((value, index) => `${(index / Math.max(values.length - 1, 1)) * 100},${92 - ((value - min) / Math.max(max - min, .01)) * 84}`).join(" ");
-  const portfolioReturn = portfolio.at(-1)! - 1;
-  const benchmarkReturn = benchmark.at(-1)! - 1;
-  const tertiaryReturn = tertiary?.at(-1) ? tertiary.at(-1)! - 1 : null;
+  const portfolioReturn = primary[inspected] - 1;
+  const benchmarkReturn = secondary[inspected] - 1;
+  const tertiaryReturn = third ? third[inspected] - 1 : null;
   const yTicks = Array.from({ length: 5 }, (_, index) => min + (max - min) * index / 4);
   const dateTickCount = large ? 9 : 7;
   const dateIndexes = [...new Set(Array.from({ length: Math.min(dateTickCount, length) }, (_, index) => Math.round(index * (length - 1) / Math.max(Math.min(dateTickCount, length) - 1, 1))))];
   const dateAt = (index: number) => dates?.[index] ?? new Date(Date.parse(`${startDate}T00:00:00Z`) + (Date.parse(`${endDate}T00:00:00Z`) - Date.parse(`${startDate}T00:00:00Z`)) * index / Math.max(length - 1, 1)).toISOString().slice(0, 10);
   const spanDays = Math.max(1, Math.round((Date.parse(`${endDate}T00:00:00Z`) - Date.parse(`${startDate}T00:00:00Z`)) / 86400000));
   const formatDate = (date: string) => new Date(`${date}T00:00:00Z`).toLocaleDateString("en-US", spanDays < 160 ? { month: "short", day: "numeric", timeZone: "UTC" } : { month: "short", year: "2-digit", timeZone: "UTC" });
+  function inspect(event:React.PointerEvent<SVGSVGElement>){const rect=event.currentTarget.getBoundingClientRect();setHoverIndex(Math.max(0,Math.min(length-1,Math.round((event.clientX-rect.left)/rect.width*(length-1)))));}
   return <>
+    <div className="performance-controls"><button aria-pressed={chartMode==="return"} onClick={()=>setChartMode("return")}>Cumulative return</button><button aria-pressed={chartMode==="drawdown"} onClick={()=>setChartMode("drawdown")}>Drawdown</button><time>{dateAt(inspected)}</time></div>
     <div className="performance-legend">
-      <span><i className="portfolio-swatch" />{primaryLabel} <b>{pct(portfolioReturn * 100)}</b></span>
-      <span><i className="benchmark-swatch" />{secondaryLabel} <b>{pct(benchmarkReturn * 100)}</b></span>
-      {tertiary && tertiaryReturn !== null && <span><i className="tertiary-swatch" />{tertiaryLabel} <b>{pct(tertiaryReturn * 100)}</b></span>}
+      <button aria-pressed={visible("portfolio")} onClick={()=>toggle("portfolio")}><i className="portfolio-swatch" />{primaryLabel} <b>{pct(portfolioReturn * 100)}</b></button>
+      <button aria-pressed={visible("benchmark")} onClick={()=>toggle("benchmark")}><i className="benchmark-swatch" />{secondaryLabel} <b>{pct(benchmarkReturn * 100)}</b></button>
+      {tertiary && tertiaryReturn !== null && <button aria-pressed={visible("tertiary")} onClick={()=>toggle("tertiary")}><i className="tertiary-swatch" />{tertiaryLabel} <b>{pct(tertiaryReturn * 100)}</b></button>}
     </div>
-    <div className={`line-chart ${large ? "large" : ""}`}>
-      <span className="chart-y-title">CUMULATIVE RETURN</span>
+    <div className={`line-chart ${large ? "large" : ""}`} tabIndex={0} role="slider" aria-label="Inspect performance by date" aria-valuemin={0} aria-valuemax={Math.max(0,length-1)} aria-valuenow={inspected} aria-valuetext={dateAt(inspected)} onBlur={()=>setHoverIndex(null)} onPointerLeave={()=>setHoverIndex(null)} onKeyDown={e=>{if(["ArrowLeft","ArrowRight","Home","End","Escape"].includes(e.key)){e.preventDefault();setHoverIndex(e.key==="Escape"?null:e.key==="Home"?0:e.key==="End"?length-1:Math.max(0,Math.min(length-1,inspected+(e.key==="ArrowLeft"?-1:1))));}}}>
+      <span className="chart-y-title">{chartMode==="return"?"CUMULATIVE RETURN":"DRAWDOWN"}</span>
       <div className="chart-y-axis">{yTicks.map((tick) => <span key={tick} style={{ bottom: `${((tick - min) / Math.max(max - min, .01)) * 84 + 8}%` }}>{pct((tick - 1) * 100).replace("+", "")}</span>)}</div>
-      <svg className="spark" viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label={`Cumulative return: ${primaryLabel} ${pct(portfolioReturn * 100)}, ${secondaryLabel} ${pct(benchmarkReturn * 100)}${tertiaryReturn === null ? "" : `, ${tertiaryLabel} ${pct(tertiaryReturn * 100)}`}`}>
+      <svg onPointerMove={inspect} onPointerDown={inspect} className="spark" viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label={`${chartMode==="return"?"Cumulative return":"Drawdown"}: ${primaryLabel} ${pct(portfolioReturn * 100)}, ${secondaryLabel} ${pct(benchmarkReturn * 100)}${tertiaryReturn === null ? "" : `, ${tertiaryLabel} ${pct(tertiaryReturn * 100)}`}`}>
         {yTicks.map(tick => <line key={tick} x1="0" y1={92 - ((tick - min) / Math.max(max - min, .01)) * 84} x2="100" y2={92 - ((tick - min) / Math.max(max - min, .01)) * 84} className="gridline" />)}
         {dateIndexes.map(index => <line key={index} x1={index / Math.max(length - 1, 1) * 100} y1="8" x2={index / Math.max(length - 1, 1) * 100} y2="92" className="chart-date-guide" />)}
         <line x1="0" y1={92 - ((1 - min) / Math.max(max - min, .01)) * 84} x2="100" y2={92 - ((1 - min) / Math.max(max - min, .01)) * 84} className="baseline" />
-        {tertiary && <polyline points={points(sampledTertiary)} className="tertiary-line" />}
-        <polyline points={points(sampledBenchmark)} className="benchmark-line" />
-        <polyline points={points(sampledPortfolio)} className="portfolio-line" />
+        {tertiary && visible("tertiary") && <polyline points={points(sampledTertiary)} className="tertiary-line" />}
+        {visible("benchmark")&&<polyline points={points(sampledBenchmark)} className="benchmark-line" />}
+        {visible("portfolio")&&<polyline points={points(sampledPortfolio)} className="portfolio-line" />}
+        {hoverIndex!==null&&<line x1={inspected/Math.max(length-1,1)*100} x2={inspected/Math.max(length-1,1)*100} y1="8" y2="92" className="performance-cursor"/>}
+        <rect x="0" y="0" width="100" height="100" fill="transparent"/>
       </svg>
       <div className="chart-date-axis">{dateIndexes.map((index, tickIndex) => <span key={`${index}-${dateAt(index)}`} className={tickIndex === 0 ? "first" : tickIndex === dateIndexes.length - 1 ? "last" : ""} style={{ left: `${index / Math.max(length - 1, 1) * 100}%` }}>{formatDate(dateAt(index))}</span>)}</div>
     </div>
-    <p className="chart-definition">{definition}</p>
+    <p className="chart-definition">{chartMode==="return"?definition:"Decline from each series’ previous high within the displayed period."} Hover to inspect a date; click a legend item to hide or show its curve.</p>
   </>;
 }
 
 function DecompositionChart({ decomposition }: { decomposition: SecurityDrilldownAnalytics["decomposition"] }) {
   const [displayMode,setDisplayMode]=useState<"stacked"|"cumulative">("stacked");
+  const [hiddenSeries,setHiddenSeries]=useState<string[]>([]);
+  const isVisible=(key:string)=>!hiddenSeries.includes(key);
+  const toggleSeries=(key:string)=>setHiddenSeries(old=>old.includes(key)?old.filter(k=>k!==key):[...old,key]);
   const [inspectedDate,setInspectedDate]=useState<string|null>(null);
   const length = decomposition.dates.length;
   const inspectedIndex=inspectedDate===null?-1:decomposition.dates.indexOf(inspectedDate);
@@ -155,11 +170,12 @@ function DecompositionChart({ decomposition }: { decomposition: SecurityDrilldow
     ...decomposition.factors.map((factor, index) => ({ key: factor.name, label: factor.name, group: factor.group, values: factor.values, className: `decomp-factor-${index}` })),
     { key: "idiosyncratic", label: "Idiosyncratic", values: decomposition.idiosyncratic, className: "decomp-idio" },
   ];
+  const visibleComponents=components.filter(c=>isVisible(c.key));
   const stackedBounds = indexes.flatMap((index) => {
-    const values = components.map((component) => component.values[index]);
-    return [values.filter((value) => value > 0).reduce((sum, value) => sum + value, 0), values.filter((value) => value < 0).reduce((sum, value) => sum + value, 0), decomposition.observed[index], decomposition.systematic[index]];
+    const values = visibleComponents.map((component) => component.values[index]);
+    return [values.filter((value) => value > 0).reduce((sum, value) => sum + value, 0), values.filter((value) => value < 0).reduce((sum, value) => sum + value, 0), ...(isVisible("observed")?[decomposition.observed[index]]:[])];
   });
-  const cumulativeBounds = indexes.flatMap((index) => [decomposition.observed[index], decomposition.systematic[index], decomposition.idiosyncratic[index]]);
+  const cumulativeBounds = indexes.flatMap((index) => [...(isVisible("observed")?[decomposition.observed[index]]:[]),...(isVisible("systematic")?[decomposition.systematic[index]]:[]),...(isVisible("idiosyncratic")?[decomposition.idiosyncratic[index]]:[])]);
   const bounds = displayMode === "stacked" ? stackedBounds : cumulativeBounds;
   const rawMin = Math.min(0, ...bounds);
   const rawMax = Math.max(0, ...bounds);
@@ -187,7 +203,7 @@ function DecompositionChart({ decomposition }: { decomposition: SecurityDrilldow
     { key: "observed", label: "OBSERVED", value: observedEnd, rawTop: y(observedEnd), className: "decomp-observed" },
     { key: "systematic", label: "SYSTEMATIC", value: systematicEnd, rawTop: y(systematicEnd), className: "decomp-systematic" },
     { key: "idiosyncratic", label: "IDIOSYNCRATIC", value: idiosyncraticEnd, rawTop: y(idiosyncraticEnd), className: "decomp-idio" },
-  ]).sort((a,b)=>a.rawTop-b.rawTop);
+  ]).filter(label=>isVisible(label.key)).sort((a,b)=>a.rawTop-b.rawTop);
   const labelGap = 4.25;
   const endLabels = rawEndLabels.map((label,index) => ({...label,top:index===0?Math.max(5,label.rawTop):Math.max(label.rawTop,5+index*labelGap)}));
   for(let index=1;index<endLabels.length;index++)endLabels[index].top=Math.max(endLabels[index].top,endLabels[index-1].top+labelGap);
@@ -196,7 +212,7 @@ function DecompositionChart({ decomposition }: { decomposition: SecurityDrilldow
   const stackedBars=useMemo(()=>displayMode==="stacked"?indexes.flatMap((index, position) => {
             let positiveBase = 0;
             let negativeBase = 0;
-            const orderedComponents = components
+            const orderedComponents = visibleComponents
               .map((component, order) => ({ component, order, value: component.values[index] }))
               .sort((a, b) => {
                 if (a.component.key === "idiosyncratic") return 1;
@@ -209,16 +225,15 @@ function DecompositionChart({ decomposition }: { decomposition: SecurityDrilldow
               if (value >= 0) positiveBase = end; else negativeBase = end;
               return <rect key={`${component.key}-${index}`} x={x(position)-barWidth/2} y={Math.min(y(start),y(end))} width={barWidth} height={Math.max(Math.abs(y(start)-y(end)),.1)} className={component.className}><title>{`${decomposition.dates[index]} · ${component.label} cumulative contribution ${pp(value*100)}`}</title></rect>;
             });
-          }):null,[decomposition,displayMode]);
+          }):null,[decomposition,displayMode,hiddenSeries]);
   return <>
     <div className="decomposition-toolbar"><button type="button" aria-pressed={displayMode==="stacked"} className={displayMode==="stacked"?"active":""} onClick={()=>setDisplayMode("stacked")}>STACKED</button><button type="button" aria-pressed={displayMode==="cumulative"} className={displayMode==="cumulative"?"active":""} onClick={()=>setDisplayMode("cumulative")}>CUMULATIVE RETURN</button><b>{displayMode==="stacked"?`${length.toLocaleString()} DAILY OBSERVATIONS · EACH BAR = CUMULATIVE THROUGH DATE`:`${length.toLocaleString()} TRADING DAYS · DAILY-LINKED LINES`}</b></div>
     <div className="decomposition-frame" onPointerLeave={event=>{if(event.pointerType!=="touch")setInspectedDate(null);}}>
       <div className="decomposition-legend">
         <strong>{displayMode==="stacked"?"RETURN COMPONENTS":"CUMULATIVE RETURN SERIES"}</strong>
         <small className="decomposition-readout-date">Cumulative through <time dateTime={readoutDate}>{readoutDate}</time></small>
-        <span><i className="decomp-idio"/>{displayMode==="stacked"?"Idiosyncratic":"Idiosyncratic contribution"}<em>Residual</em><b>{pp((decomposition.idiosyncratic[readoutIndex]??0)*100)}</b></span>
-        <span><i className="decomp-observed"/>Observed return<em>Total</em><b>{pct((decomposition.observed[readoutIndex]??0)*100)}</b></span>
-        {displayMode==="stacked" ? components.filter(component=>component.key!=="idiosyncratic").map((component) => <span key={component.key}><i className={component.className}/>{component.label}<em>{"group" in component ? component.group : "Residual"}</em><b>{pp((component.values[readoutIndex]??0)*100)}</b></span>) : <span><i className="decomp-systematic"/>Systematic fitted<em>Model</em><b>{pp((decomposition.systematic[readoutIndex]??0)*100)}</b></span>}
+        {(displayMode==="stacked"?[components[components.length-1],{key:"observed",label:"Observed return",group:"Total",values:decomposition.observed,className:"decomp-observed"},...components.slice(0,-1)]:[components[components.length-1],{key:"observed",label:"Observed return",group:"Total",values:decomposition.observed,className:"decomp-observed"},{key:"systematic",label:"Systematic fitted",group:"Model",values:decomposition.systematic,className:"decomp-systematic"}]).map(component=><button type="button" key={component.key} className={`decomposition-series-toggle ${isVisible(component.key)?"":"series-hidden"}`} aria-pressed={isVisible(component.key)} aria-label={`${isVisible(component.key)?"Hide":"Show"} ${component.label}`} onClick={()=>toggleSeries(component.key)}><i className={component.className}/><span>{component.label}</span><em>{"group" in component?component.group:"Residual"}</em><b>{component.key==="observed"?pct((component.values[readoutIndex]??0)*100):pp((component.values[readoutIndex]??0)*100)}</b><small aria-hidden="true">{isVisible(component.key)?"◉":"○"}</small></button>)}
+        <div className="decomposition-visibility"><small>Click a row to hide or show</small>{hiddenSeries.length>0&&<button onClick={()=>setHiddenSeries([])}>Show all</button>}</div>
       </div>
       <div className="decomposition-axis">{ticks.map((tick)=><span key={tick} style={{top:`${y(tick)}%`}}>{(tick*100).toFixed(0)}%</span>)}</div>
       <div className="decomposition-end-labels" hidden={inspecting}>{endLabels.map((label)=><span key={label.key} className={label.className} style={{top:`${label.top}%`}}><em>{label.label}</em>{label.key==="observed"?pct(label.value*100):pp(label.value*100)}</span>)}</div>
@@ -229,8 +244,8 @@ function DecompositionChart({ decomposition }: { decomposition: SecurityDrilldow
           <line x1="0" x2="100" y1={y(0)} y2={y(0)} className="decomposition-zero"/>
           {stackedBars}
           {!inspecting&&endLabels.map((label)=><line key={`leader-${label.key}`} x1="97" x2="100" y1={label.rawTop} y2={label.top} className={`decomposition-leader ${label.className}`}/>) }
-          {displayMode==="cumulative" && <><polyline points={systematicPoints} className="decomposition-systematic-line"/><polyline points={idiosyncraticPoints} className="decomposition-idio-line"/></>}
-          <polyline points={observedPoints} className="decomposition-observed-line"/>
+          {displayMode==="cumulative" && <>{isVisible("systematic")&&<polyline points={systematicPoints} className="decomposition-systematic-line"/>}{isVisible("idiosyncratic")&&<polyline points={idiosyncraticPoints} className="decomposition-idio-line"/>}</>}
+          {isVisible("observed")&&<polyline points={observedPoints} className="decomposition-observed-line"/>}
           {inspecting&&<g className="decomposition-hover-guide" aria-hidden="true"><line x1={x(readoutIndex)} x2={x(readoutIndex)} y1="5" y2="94"/><line x1={x(readoutIndex)-.5} x2={x(readoutIndex)+.5} y1={y(decomposition.observed[readoutIndex])} y2={y(decomposition.observed[readoutIndex])} className="decomposition-hover-point"/></g>}
           <rect x="0" y="0" width="100" height="100" fill="transparent" className="decomposition-hit-area"/>
 
@@ -238,7 +253,7 @@ function DecompositionChart({ decomposition }: { decomposition: SecurityDrilldow
         <div className="decomposition-date-axis">{inspecting&&<b className="decomposition-hover-date" style={{left:`${x(readoutIndex)}%`,transform:`translateX(${readoutIndex<length*.1?0:readoutIndex>length*.9?-100:-50}%)`}}>{readoutDate}</b>}{dateTickIndexes.map((index,tickIndex)=><span key={decomposition.dates[index]} className={tickIndex===0?"first":tickIndex===dateTickIndexes.length-1?"last":""} style={{left:`${x(index)}%`}}>{formatDateTick(decomposition.dates[index])}</span>)}</div>
       </div>
     </div>
-    <p className="chart-definition">{displayMode==="stacked"?"Component labels are percentage-point (pp) contributions to portfolio return, not beta exposures. Every vertical bar corresponds to one trading day and shows cumulative contributions through that date. Within each positive and negative stack, factor contributions run from the smallest absolute value near zero to the largest outward; the idiosyncratic contribution is always the outermost layer. A narrow gap separates adjacent sessions.":"Observed return is shown against the cumulative fitted systematic return and cumulative idiosyncratic contribution."} Daily ETF-proxy factor effects are linked using beginning-of-day security wealth; the idiosyncratic component includes the intercept and residual, so the analysis reconciles exactly to the observed adjusted-price return.</p>
+    <p className="chart-definition">{hiddenSeries.length>0&&<strong>Some series are hidden. Visible contributions need not sum to observed return; the underlying attribution is unchanged. </strong>}{displayMode==="stacked"?"Component labels are percentage-point (pp) contributions to portfolio return, not beta exposures. Every vertical bar corresponds to one trading day and shows cumulative contributions through that date. Within each positive and negative stack, factor contributions run from the smallest absolute value near zero to the largest outward; the idiosyncratic contribution is always the outermost layer. A narrow gap separates adjacent sessions.":"Observed return is shown against the cumulative fitted systematic return and cumulative idiosyncratic contribution."} Daily ETF-proxy factor effects are linked using beginning-of-day security wealth; the idiosyncratic component includes the intercept and residual, so the analysis reconciles exactly to the observed adjusted-price return.</p>
   </>;
 }
 
@@ -385,7 +400,7 @@ function StrategyAnalysis(props: StrategyWorkspaceProps) {
 
 export default function Home() {
   const [view, setView] = useState<View>("Overview");
-  const [optimizerRiskEstimator,setOptimizerRiskEstimator]=useState<RiskEstimator>("SEC fundamentals + residual PCA");
+  const [optimizerRiskEstimator,setOptimizerRiskEstimator]=useState<RiskEstimator>("Ledoit–Wolf");
   const [csvGuideNavigation, setCsvGuideNavigation] = useState(0);
   useEffect(()=>{const open=()=>{setView("Methodology");requestAnimationFrame(()=>document.getElementById("about-models")?.scrollIntoView({block:"start"}));};window.addEventListener("factorscope-open-about",open);return()=>window.removeEventListener("factorscope-open-about",open);},[]);
   const [csvUploadOpen, setCsvUploadOpen] = useState(false);
@@ -633,8 +648,8 @@ export default function Home() {
         </div>}
 
         {(dataError||missingHoldings.length>0)&&<div className={`prototype-note ${dataError ? "prototype-error" : missingHoldings.length ? "prototype-warning" : ""}`}><span>{dataError ? dataErrorKind === "request" ? "INVALID REQUEST" : "CONNECTION ISSUE" : missingHoldings.length ? "PARTIAL DATA" : "LIVE DEMO"}</span><p>{dataError ? dataErrorKind === "request" ? dataError : `${dataError} The interface remains available; retry the connection when ready.` : missingHoldings.length ? `No usable Yahoo history for ${missingHoldings.join(", ")}. Analytics exclude those positions and retain their value in portfolio cash.` : `USD portfolio analytics calculated from Yahoo Finance daily adjusted prices${marketData?.asOf ? ` through ${marketData.asOf}` : ""}.`}</p>{dataError && <button onClick={loadMarketData}>Retry</button>}</div>}
-        <div className="page-head">
-          <div><span className="kicker">{view === "Overview" ? "LIVE PORTFOLIO INTELLIGENCE" : `FACTORSCOPE / ${primarySection.toUpperCase()}`}</span><h1>{displayedViewCopy[0]}</h1><p>{displayedViewCopy[1]}</p></div>
+        <div className={`page-head ${primarySection==="Portfolio"||primarySection==="Risk & Attribution"?"compact-page-head":""}`}>
+          <div className="page-heading-copy"><span className="kicker">{view === "Overview" ? "LIVE PORTFOLIO INTELLIGENCE" : `FACTORSCOPE / ${primarySection.toUpperCase()}`}</span><h1>{displayedViewCopy[0]}</h1><p>{displayedViewCopy[1]}</p></div>
           {(isCovarianceView||view==="Optimizer")?<div className="date-control covariance-date-control"><span>{view==="Optimizer"?"OPTIMIZATION AS OF":"FORECAST AS OF"}</span><label><small>DATE</small><input type="date" aria-label="Covariance forecast date" min={availableStartDate} max={availableEndDate} value={analysisEnd} disabled={!availableEndDate} onChange={(event)=>setAnalysisEnd(event.target.value)} /></label></div>:!isStatisticalView && primarySection !== "About" && view !== "Compare" && !(view === "Performance" && performanceTab === "Event Analysis") && <div className="date-control"><span>ANALYSIS PERIOD</span><label><small>FROM</small><input type="date" aria-label="Analysis start date" min={availableStartDate} max={analysisEnd || availableEndDate} value={analysisStart} disabled={!availableStartDate} onChange={(event)=>setAnalysisStart(event.target.value)} /></label><i>→</i><label><small>TO</small><input type="date" aria-label="Analysis end date" min={analysisStart || availableStartDate} max={availableEndDate} value={analysisEnd} disabled={!availableEndDate} onChange={(event)=>setAnalysisEnd(event.target.value)} /></label></div>}
         </div>
 

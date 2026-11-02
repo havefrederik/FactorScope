@@ -216,8 +216,9 @@ function DecompositionChart({ decomposition }: { decomposition: SecurityDrilldow
       <div className="decomposition-legend">
         <strong>{displayMode==="stacked"?"RETURN COMPONENTS":"CUMULATIVE RETURN SERIES"}</strong>
         <small className="decomposition-readout-date">Cumulative through <time dateTime={readoutDate}>{readoutDate}</time></small>
+        <span><i className="decomp-idio"/>{displayMode==="stacked"?"Idiosyncratic":"Idiosyncratic contribution"}<em>Residual</em><b>{pp((decomposition.idiosyncratic[readoutIndex]??0)*100)}</b></span>
         <span><i className="decomp-observed"/>Observed return<em>Total</em><b>{pct((decomposition.observed[readoutIndex]??0)*100)}</b></span>
-        {displayMode==="stacked" ? components.map((component) => <span key={component.key}><i className={component.className}/>{component.label}<em>{"group" in component ? component.group : "Residual"}</em><b>{pp((component.values[readoutIndex]??0)*100)}</b></span>) : <><span><i className="decomp-systematic"/>Systematic fitted<em>Model</em><b>{pp((decomposition.systematic[readoutIndex]??0)*100)}</b></span><span><i className="decomp-idio"/>Idiosyncratic contribution<em>Residual</em><b>{pp((decomposition.idiosyncratic[readoutIndex]??0)*100)}</b></span></>}
+        {displayMode==="stacked" ? components.filter(component=>component.key!=="idiosyncratic").map((component) => <span key={component.key}><i className={component.className}/>{component.label}<em>{"group" in component ? component.group : "Residual"}</em><b>{pp((component.values[readoutIndex]??0)*100)}</b></span>) : <span><i className="decomp-systematic"/>Systematic fitted<em>Model</em><b>{pp((decomposition.systematic[readoutIndex]??0)*100)}</b></span>}
       </div>
       <div className="decomposition-axis">{ticks.map((tick)=><span key={tick} style={{top:`${y(tick)}%`}}>{(tick*100).toFixed(0)}%</span>)}</div>
       <div className="decomposition-end-labels" hidden={inspecting}>{endLabels.map((label)=><span key={label.key} className={label.className} style={{top:`${label.top}%`}}><em>{label.label}</em>{label.key==="observed"?pct(label.value*100):pp(label.value*100)}</span>)}</div>

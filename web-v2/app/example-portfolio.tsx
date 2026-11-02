@@ -2,7 +2,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { buildPortfolioDecomposition, type MarketPayload, type PortfolioAnalytics, type SecurityDecomposition } from "@/lib/analytics";
 import type { ExamplePortfolioResult } from "@/lib/example-portfolio";
-import { buildPortfolioGroups } from "@/lib/portfolio-groups";
+import { buildPortfolioGroups, type PortfolioGrouping } from "@/lib/portfolio-groups";
 import GroupReturnsChart, { groupStyle } from "./group-returns-chart";
 import PortfolioHoldings from "./portfolio-holdings";
 
@@ -11,13 +11,13 @@ const pct=(n:number)=>`${(100*n).toFixed(2)}%`;
 export default function ExamplePortfolio({payload,example,sectors,firstMonth,setFirstMonth,cost,setCost,selectedDate,setSelectedDate,onSelectTicker,renderPerformance,renderDecomposition,portfolioName="US Equity Portfolio",isAI=false}:{portfolioName?:string;isAI?:boolean;payload:MarketPayload;example:ExamplePortfolioResult;sectors:Record<string,string>;firstMonth:string;setFirstMonth:(value:string)=>void;cost:number;setCost:(value:number)=>void;selectedDate:string;setSelectedDate:(value:string)=>void;onSelectTicker:(ticker:string)=>void;renderPerformance:(analytics:PortfolioAnalytics)=>ReactNode;renderDecomposition:(decomposition:SecurityDecomposition)=>ReactNode}){
   const end=payload.asOf??"";
   const decomposition=useMemo(()=>example?buildPortfolioDecomposition(payload,example.analytics):null,[payload,example]);
-  const grouped=useMemo(()=>buildPortfolioGroups(payload,example,sectors),[payload,example,sectors]);
   const [chartView,setChartView]=useState<"Attribution"|"Returns by group"|"Performance">("Attribution");
-  const [grouping,setGrouping]=useState<"Stocks"|"Sectors">("Stocks");
+  const [grouping,setGrouping]=useState<PortfolioGrouping>("Stocks");
+  const grouped=useMemo(()=>buildPortfolioGroups(payload,example,sectors,grouping),[payload,example,sectors,grouping]);
   const [selectedGroup,setSelectedGroup]=useState<string|null>(null);
   const index=Math.max(0,selectedDate?example.days.findLastIndex(day=>day.date<=selectedDate):example.days.length-1);
   const day=example.days[index],rebalance=example.rebalances[day.rebalance];
-  function selectGroup(name:string|null){setSelectedGroup(name);setGrouping("Sectors");setChartView("Returns by group");}
+  function selectGroup(name:string|null){setSelectedGroup(name);setChartView("Returns by group");}
   const positions=[...example.tickers.map((ticker,i)=>({ticker,sector:sectors[ticker]??"Unclassified",value:day.values[i]})).filter(row=>row.value!==0||(rebalance?.targets[example.tickers.indexOf(row.ticker)]??0)!==0),{ticker:"CASH",sector:"Cash",value:day.cash}];
   const allocation=rebalance?{date:rebalance.date,weights:Object.fromEntries(example.tickers.map((ticker,i)=>[ticker,rebalance.targets[i]]))}:undefined;
   function download(){
@@ -38,12 +38,12 @@ export default function ExamplePortfolio({payload,example,sectors,firstMonth,set
       <div className="portfolio-chart-stack">
         <section className="panel example-chart overview-main-chart">
           <div className="portfolio-chart-tabs" role="tablist" aria-label="Portfolio charts">
-            {(["Attribution","Returns by group","Performance"] as const).map(tab=><button key={tab} role="tab" aria-selected={chartView===tab} className={chartView===tab?"active":""} onClick={()=>{setChartView(tab);if(tab==="Returns by group")setGrouping("Sectors");}}>{tab}</button>)}
-            <span>{chartView==="Attribution"?"Factor & idiosyncratic return":chartView==="Returns by group"?"Sector baskets · gross returns":"Portfolio vs. S&P 500"}</span>
+            {(["Attribution","Returns by group","Performance"] as const).map(tab=><button key={tab} role="tab" aria-selected={chartView===tab} className={chartView===tab?"active":""} onClick={()=>{setChartView(tab);if(tab==="Returns by group"&&chartView!=="Returns by group"){setGrouping("Sectors");setSelectedGroup(null);}}}>{tab}</button>)}
+            <span>{chartView==="Attribution"?"Factor & idiosyncratic return":chartView==="Returns by group"?`${grouping} · gross returns`:"Portfolio vs. S&P 500"}</span>
           </div>
           <div className={chartView==="Attribution"?"portfolio-chart-content overview-decomposition":"portfolio-chart-content"} role="tabpanel" aria-label={chartView}>
             {chartView==="Attribution"&&(decomposition?renderDecomposition(decomposition):<p className="archive-table-note">Factor history is incomplete for this period. Choose a more recent starting month.</p>)}
-            {chartView==="Returns by group"&&<GroupReturnsChart dates={grouped.dates} groups={grouped.groups} selectedGroup={selectedGroup} onSelectGroup={selectGroup} selectedDate={day.date} onSelectDate={setSelectedDate}/>}
+            {chartView==="Returns by group"&&<><div className="holdings-grouping" aria-label="Group chart and holdings">{(["Stocks","Sectors",...(example.days.some(d=>d.values.some(v=>v<0))?["Long / short"]:[])] as PortfolioGrouping[]).map(mode=><button key={mode} className={grouping===mode?"active":""} aria-pressed={grouping===mode} onClick={()=>{setGrouping(mode);setSelectedGroup(null);}}>{mode}</button>)}</div><GroupReturnsChart dates={grouped.dates} groups={grouped.groups} selectedGroup={selectedGroup} onSelectGroup={selectGroup} selectedDate={day.date} onSelectDate={setSelectedDate}/></>}
             {chartView==="Performance"&&renderPerformance(example.analytics)}
           </div>
         </section>
@@ -57,7 +57,7 @@ export default function ExamplePortfolio({payload,example,sectors,firstMonth,set
             <article title="Historical market beta against the S&P 500"><span>Market beta</span><strong>{example.analytics.beta.toFixed(2)}</strong></article>
           </div>
         </section>
-        <PortfolioHoldings positions={positions} total={day.nav} history={{dates:example.days.map(day=>day.date),selectedDate:day.date,onSelectDate:setSelectedDate}} allocation={allocation} grouping={grouping} onGroupingChange={mode=>{setGrouping(mode);if(mode==="Sectors")setChartView("Returns by group");}} selectedGroup={selectedGroup} onSelectGroup={selectGroup} groupColors={Object.fromEntries(grouped.groups.map((group,i)=>[group.name,groupStyle(group.name).color]))} onSelectTicker={onSelectTicker} footer={isAI?undefined:<details className="example-cost-settings"><summary>Transaction costs <span>{cost} bps</span></summary><div><label>Execution cost (bps)<input aria-label="Example execution cost" type="number" min="0" max="100" value={cost} onChange={e=>setCost(Math.min(100,Math.max(0,Number(e.target.value))))}/></label><p>Estimated total: <strong>{money(example.totalCosts)}</strong>. Portfolio performance is shown after these costs; sector return paths are gross.</p></div></details>}/>
+        <PortfolioHoldings positions={positions} total={day.nav} history={{dates:example.days.map(day=>day.date),selectedDate:day.date,onSelectDate:setSelectedDate}} allocation={allocation} grouping={grouping} onGroupingChange={mode=>{setGrouping(mode);setSelectedGroup(null);setChartView("Returns by group");}} groupingOptions={(["Stocks","Sectors",...(example.days.some(d=>d.values.some(v=>v<0))?["Long / short"]:[])] as PortfolioGrouping[])} selectedGroup={selectedGroup} onSelectGroup={selectGroup} groupColors={Object.fromEntries(grouped.groups.map((group,i)=>[group.name,groupStyle(group.name).color]))} onSelectTicker={onSelectTicker} footer={isAI?undefined:<details className="example-cost-settings"><summary>Transaction costs <span>{cost} bps</span></summary><div><label>Execution cost (bps)<input aria-label="Example execution cost" type="number" min="0" max="100" value={cost} onChange={e=>setCost(Math.min(100,Math.max(0,Number(e.target.value))))}/></label><p>Estimated total: <strong>{money(example.totalCosts)}</strong>. Portfolio performance is shown after these costs; sector return paths are gross.</p></div></details>}/>
       </aside>
     </div>
   </div>;

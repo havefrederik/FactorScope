@@ -663,3 +663,61 @@
 .optimizer-factor-selection{display:flex;flex-wrap:wrap;gap:12px 20px;padding:16px}.optimizer-factor-selection p{width:100%}.optimizer-factor-selection label{display:flex;align-items:center;gap:6px;min-width:100px}
 
 .compare-results-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:start;margin:18px 0}.compare-workspace>.compare-chart{margin-bottom:18px}.compare-review-header h3{margin:0 0 6px;font-size:19px;font-weight:500}.compare-method-link{border:0;background:none;color:var(--muted);font:inherit;cursor:pointer;text-decoration:underline;text-underline-offset:4px}.compare-sharpe-row{background:rgba(26,155,155,.12)}.compare-sharpe-row th,.compare-sharpe-row td{font-weight:600;font-size:17px}.compare-results-grid .compare-summary{min-width:0}.compare-workspace .compare-review-header{margin-bottom:14px}@media(max-width:1100px){.compare-results-grid{grid-template-columns:1fr}}
+
+/* Connected portfolio comparison and scenario workspaces. */
+.compare-connected{display:grid;grid-template-columns:minmax(290px,.75fr) minmax(0,1.8fr);gap:16px;align-items:start;margin-top:16px}
+.compare-connected .compare-editor{position:sticky;top:18px;min-width:0}
+.compare-connected .compare-holdings-scroll{max-height:calc(100vh - 140px);overflow:auto}
+.compare-analysis-main{min-width:0;display:grid;gap:14px}
+.compare-analysis-main .compare-results-grid{margin:0;align-items:start}
+.compare-connected table{font-size:12px}
+.compare-connected td,.compare-connected th{padding:10px 12px}
+.compare-connected .compare-summary table{min-width:370px}
+.compare-connected .panel-title{padding:16px;align-items:start;gap:8px;flex-wrap:wrap}
+.compare-connected .panel-title h3{font-size:17px}
+.compare-connected .panel-title span{font-size:11px}
+.compare-connected .compare-weight-input input{width:72px;padding:8px}
+.compare-detail-tabs{display:flex;gap:6px;border-bottom:1px solid var(--border,#343833);padding-bottom:8px}
+.compare-detail-tabs button{padding:9px 14px;border:1px solid transparent;border-radius:5px;background:transparent;color:var(--muted,#a7b2b5);cursor:pointer}
+.compare-detail-tabs button.active{background:#293b3e;border-color:#37717a;color:#fff}
+.compare-saved{margin-top:14px;color:#b9c2c2;font-size:13px}
+.compare-saved summary{cursor:pointer;width:fit-content}
+.compare-save-controls,.compare-saved-row{display:flex;gap:12px;align-items:center;margin-top:10px;flex-wrap:wrap}
+.compare-saved-row span{min-width:180px}
+.compare-save-controls input,.compare-saved button{border:1px solid #414943;background:#1c211f;color:#e5e6df;border-radius:5px;padding:9px 12px}
+.compare-saved button:disabled{opacity:.4}
+.stock-highlight{border:0;background:transparent;padding:4px 8px 4px 0;cursor:pointer}
+.group-return-legend{max-height:116px;overflow:auto}
+.group-return-tooltip{max-height:300px;overflow:auto;pointer-events:none}
+.stress-grid{display:grid;grid-template-columns:minmax(260px,.65fr) minmax(0,1.8fr);gap:18px;align-items:start}
+.stress-rankings{position:sticky;top:18px;overflow:hidden}
+.stress-rank{width:100%;display:grid;grid-template-columns:1fr auto;gap:12px;text-align:left;border:0;border-bottom:1px solid #343a35;background:transparent;padding:20px;color:#cbd1cb;cursor:pointer}
+.stress-rank.active{background:#243435;box-shadow:inset 3px 0 #69bcb5}
+.stress-rank i{grid-column:1/-1;background:#272c29;height:5px;display:block}
+.stress-rank i b{display:block;height:100%}
+.stress-detail{display:grid;gap:18px;min-width:0}
+.stress-custom{padding:20px}.stress-custom h3{font-size:15px;margin-bottom:18px}
+.stress-custom label{display:block;color:#aebbb9;font-size:13px;margin-top:20px}.stress-custom strong{float:right}.stress-custom input{display:block;width:100%;margin-top:16px;accent-color:#7cc4bb}
+.stress-impact{display:flex;gap:40px;flex-wrap:wrap;padding:24px}.stress-impact span{display:block;font-size:13px;color:#9eaaa5}.stress-impact strong{display:block;font-size:30px;margin-top:10px;font-variant-numeric:tabular-nums}
+.stress-components{display:flex;border-top:1px solid #343a35;gap:40px;padding:20px 24px}.stress-components span,.stress-components small{display:block;color:#aebbb9;font-size:12px}.stress-components b{display:block;margin:8px 0;font-size:18px}
+.stress-position-scroll{max-height:380px;overflow:auto}.stress-missing{padding:20px;color:#b4beb8}
+@media(min-width:1800px){.compare-connected{grid-template-columns:minmax(360px,.7fr) minmax(0,1.8fr)}}
+@media(max-width:1200px){.compare-analysis-main .compare-results-grid{grid-template-columns:1fr}.compare-connected .compare-summary table{min-width:360px}}
+@media(max-width:900px){.compare-connected,.stress-grid{grid-template-columns:1fr}.compare-connected .compare-editor,.stress-rankings{position:static}.compare-connected .compare-holdings-scroll{max-height:340px}.compare-connected .compare-summary table{min-width:350px}.stress-workspace .compare-review-header{align-items:start;gap:15px;flex-wrap:wrap}}
+
+.holdings-basis{padding:6px 16px 12px;display:flex;justify-content:flex-end;color:#a4b2ac;font-size:12px}.holdings-basis select{margin-left:12px;border:1px solid #424941;border-radius:5px;padding:5px 10px;background:#202420;color:#e2e5de}
+
+.compare-connected .compare-holdings-scroll table{min-width:330px}
+.compare-connected .compare-editor th,.compare-connected .compare-editor td{padding:10px 7px}
+.compare-connected .compare-editor th small{max-width:84px}
+.compare-connected .compare-weight-input input{width:62px}
+.compare-workspace .compare-review-header{margin-bottom:0}
+.compare-workspace .compare-review-header>div>span{font-size:12px;color:#9bada9}
+.compare-workspace .compare-saved{margin-top:0}
+.compare-connected{margin-top:2px}
+.stress-workspace .compare-review-header{margin-bottom:18px}
+.stress-workspace .compare-review-header>div>span{font-size:12px;color:#9bada9}
+.stress-position-scroll table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+.stress-position-scroll th,.stress-position-scroll td{padding:12px 18px;text-align:right;border-bottom:1px solid #2a3b40;white-space:nowrap}
+.stress-position-scroll th:first-child{text-align:left;font-weight:500}.stress-position-scroll thead{background:#111f26;color:#99b4c0;position:sticky;top:0}
+@media(max-width:600px){.stress-position-scroll table{min-width:390px}.compare-toolbar>span{width:100%}}

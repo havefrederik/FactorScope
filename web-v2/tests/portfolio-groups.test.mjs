@@ -27,3 +27,13 @@ test("missing prices do not become fabricated zero returns",()=>{
   assert.deepEqual(groups.find(group=>group.name==="Technology").curve,[1,null,null,null]);
   assert.equal(groups.find(group=>group.name==="Energy").incomplete,false);
 });
+
+test('stock grouping and changing long/short sleeves use signed profit on gross capital',()=>{
+  const fixture={tickers:['A'],days:[{date:dates[0],nav:100,values:[100]},{date:dates[1],nav:110,values:[110]},{date:dates[2],nav:121,values:[-99]}]};
+  const p={series:{SPY:{points:dates.slice(0,3).map(date=>({date,close:100}))},A:{points:[100,110,99].map((close,i)=>({date:dates[i],close}))}}};
+  const result=buildPortfolioGroups(p,fixture,{A:'Technology'},'Long / short');
+  const long=result.groups.find(g=>g.name==='Long'),short=result.groups.find(g=>g.name==='Short');
+  assert.ok(Math.abs(long.curve[1]-1.1)<1e-12);assert.equal(long.curve[2],long.curve[1]);
+  assert.equal(short.curve[1],1);assert.ok(Math.abs(short.curve[2]-1.1)<1e-12);
+  assert.equal(buildPortfolioGroups(p,fixture,{A:'Technology'},'Stocks').groups[0].name,'A');
+});

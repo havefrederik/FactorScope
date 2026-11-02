@@ -1,3 +1,4 @@
+import { riskConcentration } from "./risk-concentration.ts";
 import { buildAnalytics, buildFactorModel, type CovarianceForecastAnalytics, type MarketPayload } from "./analytics.ts";
 
 export type ConstructionFactor = { name: string; group: string; values: number[]; unit?: string; asOf?: string };
@@ -37,6 +38,7 @@ export function constructionMeasures(snapshot: ConstructionSnapshot, weights: Re
   const expectedReturn = snapshot.expectedReturns ? dot(snapshot.expectedReturns) : null;
   return {
     volatility, expectedReturn,
+    concentration: riskConcentration(forecast.tickers, w, forecast.covarianceMatrix),
     signalRisk: snapshot.relativeSignals && volatility > 1e-10 ? dot(snapshot.relativeSignals) / volatility : null,
     assumedSharpe: expectedReturn !== null && volatility > 1e-10 ? expectedReturn / volatility : null,
     gross: w.reduce((sum, value) => sum + Math.abs(value), 0), net: w.reduce((sum, value) => sum + value, 0),

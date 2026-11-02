@@ -16,7 +16,7 @@ const sectorStyles:Record<string,{color:string;label:string}>={
   "Materials":{color:"#a6bdff",label:"Materials"},
   "Real Estate":{color:"#d5b08a",label:"Real estate"},
 };
-export function groupStyle(name:string){return sectorStyles[name]??{color:"#c3ccd5",label:name};}
+export function groupStyle(name:string){const palette=["#56b4ff","#ffab40","#74df70","#c58aff","#ff667d","#34e0cd","#f5df4d","#f4f5f7","#ff8bd4","#a6bdff"];const hash=[...name].reduce((n,c)=>n*31+c.charCodeAt(0),0)>>>0;return sectorStyles[name]??{color:name==="Long"?"#34e0cd":name==="Short"?"#ff667d":palette[hash%palette.length],label:name};}
 const pct=(value:number)=>`${value>=0?"+":""}${(value*100).toFixed(2)}%`;
 export default function GroupReturnsChart({dates,groups,selectedGroup,onSelectGroup,selectedDate,onSelectDate}:{dates:string[];groups:ReturnGroup[];selectedGroup:string|null;onSelectGroup:(name:string|null)=>void;selectedDate:string;onSelectDate:(date:string)=>void}){
   const [hover,setHover]=useState<number|null>(null);
@@ -29,14 +29,15 @@ export default function GroupReturnsChart({dates,groups,selectedGroup,onSelectGr
   const indexes=[...new Set([...Array.from({length:Math.min(400,dates.length)},(_,i)=>Math.round(i*(dates.length-1)/Math.max(1,Math.min(400,dates.length)-1))),dates.length-1])];
   const selectedIndex=Math.max(0,dates.indexOf(selectedDate));
   const inspectIndex=hover??selectedIndex;
-  const labels=groups.map((group,i)=>({group,i,value:group.curve.at(-1),top:group.curve.at(-1)!==null?y(group.curve.at(-1)!-1):0})).filter(label=>label.value!==null).sort((a,b)=>a.top-b.top);
+  const labelGroups=selectedGroup?groups.filter(g=>g.name===selectedGroup):groups.length>10?[...groups].sort((a,b)=>(b.curve.at(-1)??0)-(a.curve.at(-1)??0)).slice(0,8):groups;
+  const labels=labelGroups.map((group,i)=>({group,i,value:group.curve.at(-1),top:group.curve.at(-1)!==null?y(group.curve.at(-1)!-1):0})).filter(label=>label.value!==null).sort((a,b)=>a.top-b.top);
   labels.forEach((label,i)=>{label.top=Math.max(top,label.top,i?labels[i-1].top+27:top);});
   if(labels.length&&labels.at(-1)!.top>height-bottom){labels.at(-1)!.top=height-bottom;for(let i=labels.length-2;i>=0;i--)labels[i].top=Math.min(labels[i].top,labels[i+1].top-27);}
   function indexAt(event:React.PointerEvent<SVGSVGElement>|React.MouseEvent<SVGSVGElement>){const rect=event.currentTarget.getBoundingClientRect();const svgX=(event.clientX-rect.left)/rect.width*width;return Math.max(0,Math.min(dates.length-1,Math.round((svgX-left)/(width-left-right)*(dates.length-1))));}
   return <div className="group-return-workspace">
-    <div className="group-return-legend" aria-label="Highlight a sector">{groups.map((group,i)=><button key={group.name} aria-pressed={selectedGroup===group.name} className={selectedGroup===group.name?"active":""} onClick={()=>onSelectGroup(selectedGroup===group.name?null:group.name)}><svg width="25" height="10" viewBox="0 0 25 10" aria-hidden="true"><line x1="0" x2="25" y1="5" y2="5" stroke={groupStyle(group.name).color} strokeWidth="1.5"/></svg>{group.name}</button>)}{selectedGroup&&<button onClick={()=>onSelectGroup(null)}>Show all</button>}</div>
+    <div className="group-return-legend" aria-label="Highlight a return group">{groups.map((group,i)=><button key={group.name} aria-pressed={selectedGroup===group.name} className={selectedGroup===group.name?"active":""} onClick={()=>onSelectGroup(selectedGroup===group.name?null:group.name)}><svg width="25" height="10" viewBox="0 0 25 10" aria-hidden="true"><line x1="0" x2="25" y1="5" y2="5" stroke={groupStyle(group.name).color} strokeWidth="1.5"/></svg>{group.name}</button>)}{selectedGroup&&<button onClick={()=>onSelectGroup(null)}>Show all</button>}</div>
     <div className="group-return-chart">
-      <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" role="img" aria-label="Cumulative gross sector returns from dated portfolio holdings. Use the holdings date control for keyboard date selection." onPointerMove={event=>setHover(indexAt(event))} onPointerLeave={()=>setHover(null)} onClick={event=>onSelectDate(dates[indexAt(event)])}>
+      <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" role="img" aria-label="Cumulative gross group returns from dated portfolio holdings. Use the holdings date control for keyboard date selection." onPointerMove={event=>setHover(indexAt(event))} onPointerLeave={()=>setHover(null)} onClick={event=>onSelectDate(dates[indexAt(event)])}>
         {ticks.map(tick=><g key={tick}><line className="group-gridline" x1={left} x2={width-right} y1={y(tick)} y2={y(tick)}/><text x={left-8} y={y(tick)+4} textAnchor="end">{(tick*100).toFixed(0)}%</text></g>)}
         <line className="group-zero" x1={left} x2={width-right} y1={y(0)} y2={y(0)}/>
         {dateTicks.map(i=><g key={i}><line className="group-gridline" x1={x(i)} x2={x(i)} y1={top} y2={height-bottom}/><text x={x(i)} y={height-8} textAnchor={i===0?"start":i===dates.length-1?"end":"middle"}>{new Date(`${dates[i]}T00:00:00Z`).toLocaleDateString("en-US",{month:"short",year:"2-digit",timeZone:"UTC"})}</text></g>)}
@@ -47,7 +48,7 @@ export default function GroupReturnsChart({dates,groups,selectedGroup,onSelectGr
       </svg>
       {hover!==null&&<div className="group-return-tooltip"><strong>{dates[hover]}</strong>{groups.filter(group=>!selectedGroup||group.name===selectedGroup).map(group=><span key={group.name}><i style={{background:groupStyle(group.name).color}}/>{group.name}<b>{group.curve[hover]===null?"—":pct(group.curve[hover]!-1)}</b></span>)}</div>}
     </div>
-    <p className="group-return-caption">Gross sector returns · select a sector in the legend to isolate it; click the chart to inspect holdings on a date. Each sector starts at $1; transfers between sectors do not count as returns.</p>
-    {groups.some(group=>group.incomplete)&&<p className="group-return-caption">Some sector paths stop where allocated securities lack aligned prices.</p>}
+    <p className="group-return-caption">Gross group returns · select a group in the legend to isolate it; click the chart to inspect holdings on a date. Each group starts at $1; transfers between groups do not count as returns.</p>
+    {groups.some(group=>group.incomplete)&&<p className="group-return-caption">Some group paths stop where allocated securities lack aligned prices.</p>}
   </div>;
 }

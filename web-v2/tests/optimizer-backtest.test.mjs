@@ -22,3 +22,16 @@ test('execution costs reduce wealth and risk-only cost gate can reject a trade',
 test('weight-drift and volatility rules can trigger outside the interval',async()=>{
  for(const trigger of ['Weight drift','Volatility ceiling']){const r=await backtestOptimizer(payload,['A','B'],dates[0],dates.at(-1),[.5,.5],{...policy,interval:'Quarterly',trigger,drift:.001,volatility:.001},input);assert.equal(r.decisions,trigger==='Weight drift'?2:4);}
 });
+test('minimum holding time blocks interval and threshold trades until execution spacing is met',async()=>{
+ for(const trigger of ['Interval','Volatility ceiling','Interval or threshold']){
+  const r=await backtestOptimizer(payload,['A','B'],dates[0],dates.at(-1),[.5,.5],{...policy,interval:'Daily',trigger,volatility:0,minHoldingSessions:3},input);
+  const trades=r.events.filter(e=>e.status==='Traded');assert.equal(trades.length,2);assert.equal(trades[0].executionDate,dates[1]);assert.equal(trades[1].executionDate,dates[4]);assert.equal(r.holdingChecksSkipped,2);
+ }
+});
+test('custom interval is measured in sessions, unaffected by weekend and month changes',async()=>{
+ const seen=[];await backtestOptimizer(payload,['A','B'],dates[0],dates.at(-1),[.5,.5],{...policy,interval:'Every N sessions',intervalSessions:3},(d,w)=>{seen.push(d);return input(d,w)});assert.deepEqual(seen,[dates[0],dates[3]]);
+});
+test('a rejected trade does not start a holding lock and invalid session counts fail',async()=>{
+ const r=await backtestOptimizer(payload,['A','B'],dates[0],dates.at(-1),[.5,.5],{...policy,interval:'Daily',costGate:true,costBps:1000,minHoldingSessions:21},input);assert.equal(r.decisions,4);assert.equal(r.holdingChecksSkipped,0);
+ for(const minHoldingSessions of [-1,1.5,NaN])await assert.rejects(()=>backtestOptimizer(payload,['A','B'],dates[0],dates.at(-1),[.5,.5],{...policy,minHoldingSessions},input),/whole trading-session/);
+});

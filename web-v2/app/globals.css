@@ -792,3 +792,6 @@
 .optimizer-factor-selection .factor-checkbox-grid label{font-size:11px;margin:0;display:flex;gap:6px;align-items:center}
 .optimizer-backtest fieldset{border:0;margin:0}.optimizer-backtest summary{font-weight:600}
 .strategy-decision-scroll{max-height:320px;overflow:auto}.strategy-decision-scroll table{width:100%;font-size:11px;text-align:left}
+.hindsight-controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));align-items:end}.hindsight-controls input,.hindsight-controls select{width:100%;max-width:none!important;min-height:32px}.hindsight-controls input[type=checkbox]{width:auto;min-height:0}.hindsight-table-scroll{overflow-x:auto}.hindsight-table-scroll small{display:block;max-width:220px;color:var(--muted);margin-top:5px}.hindsight-table-scroll td,.hindsight-table-scroll th{white-space:nowrap}.hindsight-settings{font-size:11px;max-height:280px;overflow:auto;padding:14px}.optimizer-backtest{scroll-margin-top:80px}.optimizer-backtest>details{padding:12px 14px}.hindsight-table-scroll button,.optimizer-backtest .panel-title button{padding:6px 9px;border:1px solid var(--line2);border-radius:4px;background:var(--bg);color:var(--text);font-size:11px}
+
+.hindsight-table-scroll .hindsight-table{table-layout:auto;min-width:1050px}.hindsight-table th:first-child{min-width:190px}.hindsight-table-scroll{max-width:100%}

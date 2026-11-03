@@ -1,5 +1,5 @@
 import type {ReoptimizationPolicy} from './optimizer-backtest.ts';
-export type HindsightRun={version:1;id:string;name:string;createdAt:string;comparisonKey:string;modelSignature:string;modelLabel:string;policy:ReoptimizationPolicy;start:string;end:string;sharpe:number|null;baselineSharpe:number|null;totalReturn:number;maxDrawdown:number;volatility:number;trades:number;turnover:number;cost:number;dates:string[];curve:number[]};
+export type HindsightRun={version:1;id:string;name:string;createdAt:string;comparisonKey:string;modelSignature:string;modelLabel:string;policy:ReoptimizationPolicy;start:string;end:string;sharpe:number|null;baselineSharpe:number|null;sharpeBenchmark?:'French RF'|'BIL';totalReturn:number;maxDrawdown:number;volatility:number;trades:number;turnover:number;cost:number;dates:string[];curve:number[]};
 export function pathMetrics(curve:number[],returns:number[]){
  let peak=curve[0],maxDrawdown=0;for(const v of curve){peak=Math.max(peak,v);maxDrawdown=Math.min(maxDrawdown,v/peak-1);}
  const mean=returns.reduce((s,x)=>s+x,0)/returns.length;

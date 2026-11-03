@@ -1,5 +1,5 @@
 import { riskConcentration } from "./risk-concentration.ts";
-import { buildAnalytics, buildFactorModel, type CovarianceForecastAnalytics, type MarketPayload } from "./analytics.ts";
+import { buildAnalytics, buildFactorModel, type CovarianceForecastAnalytics, type MarketPayload, buildPortfolioDecomposition } from "./analytics.ts";
 
 export type ConstructionFactor = { name: string; group: string; values: number[]; unit?: string; asOf?: string };
 export type ConstructionSnapshot = {
@@ -20,11 +20,19 @@ export function buildConstructionFactors(payload: MarketPayload, forecast: Covar
   const models = forecast.tickers.map(ticker => {
     const analytics = buildAnalytics(payload, [{ ticker, value: 1 }], { startDate: dates[0].date, endDate: forecast.asOf });
     const model = analytics ? buildFactorModel(payload, analytics, 1) : null;
-    return analytics && model ? { model, idiosyncraticVolatility: analytics.annualVolatility * Math.sqrt(Math.max(0, 1 - model.rSquared)) } : null;
+    if(!analytics||!model)return null;
+    let idiosyncraticVolatility=analytics.annualVolatility*Math.sqrt(Math.max(0,1-model.rSquared));
+    if(payload.academicFactors){
+      const d=buildPortfolioDecomposition(payload,analytics);if(!d)return null;
+      const daily=d.idiosyncratic.map((v,i)=>(v-(d.idiosyncratic[i-1]??0))/analytics.curve[i]);
+      const mean=daily.reduce((s,v)=>s+v,0)/daily.length;
+      idiosyncraticVolatility=Math.sqrt(252*daily.reduce((s,v)=>s+(v-mean)**2,0)/(daily.length-1));
+    }
+    return {model,idiosyncraticVolatility};
   });
   if (models.some(model => !model)) return empty;
   return {
-    factors: models[0]!.model.factors.map(factor => ({ name: factor.name, group: factor.group, values: models.map(item => item!.model.factors.find(f => f.name === factor.name)!.exposure) })),
+    factors: models[0]!.model.factors.filter(factor=>factor.name!=="Risk-free").map(factor => ({ name: factor.name, group: factor.group, values: models.map(item => item!.model.factors.find(f => f.name === factor.name)!.exposure) })),
     idiosyncraticVolatility: models.map(item => item!.idiosyncraticVolatility),
   };
 }

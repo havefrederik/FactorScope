@@ -13,5 +13,5 @@ test("uses neutral portfolio language and one shared performance chart", async (
   assert.match(page, /Factor benchmark \(fitted\)/);
   assert.match(page, /S&P 500 \(market reference\)/);
   assert.match(page, /Current portfolio/);
-  assert.match(page, /S&amp;P 500/);
+  assert.match(page, /published daily Fama–French factors/);
 });

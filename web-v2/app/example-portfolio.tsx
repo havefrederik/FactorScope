@@ -40,7 +40,7 @@ export default function ExamplePortfolio({payload,example,sectors,firstMonth,set
           <div className="archive-metrics example-metrics">
             <article title={isAI?"Cumulative portfolio return; costs excluded":"Cumulative portfolio return after estimated execution costs"}><span>Total return</span><strong>{pct(example.analytics.totalReturn)}</strong></article>
             <article title="Compound annual growth rate over the displayed period"><span>Annualized return</span><strong>{example.annualReturn===null?"—":pct(example.annualReturn)}</strong></article>
-            <article title="Historical Sharpe over BIL cash returns; see About for methodology"><span>Sharpe ratio</span><strong>{example.sharpe?.toFixed(2)??"—"}</strong></article>
+            <article title="Historical Sharpe over published French RF; see About for methodology"><span>Sharpe ratio</span><strong>{example.sharpe?.toFixed(2)??"—"}</strong></article>
             <article title="Historical market beta against the S&P 500"><span>Market beta</span><strong>{example.analytics.beta.toFixed(2)}</strong></article>
           </div>
         </section>

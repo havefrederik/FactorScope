@@ -1,3 +1,5 @@
+import { academicAttribution, academicSecurity } from './academic-attribution.ts';
+import type { AcademicFactors } from './academic-factors.ts';
 import { historicalSharpe } from "./historical-sharpe.ts";
 import { solveConstrainedRiskAllocation } from "./risk-allocation.ts";
 import { summarizeCovariance, type CovarianceSnapshot, type CovarianceReference } from "./covariance-comparison.ts";
@@ -10,6 +12,7 @@ export type MarketPayload = {
   adjusted: boolean;
   asOf: string | null;
   factorStartDate?: string | null;
+  academicFactors?: AcademicFactors;
   series: Record<string, SymbolSeries>;
   errors: { ticker: string; message: string }[];
   missingHoldings: string[];
@@ -142,7 +145,7 @@ export type RiskTargetSnapshot = {
 };
 
 export type FactorAnalytics = { name: string; group: "Core" | "Style" | "Sector"; exposure: number; riskShare: number; annualRisk: number; returnAttribution: number };
-export type FactorLayerAnalytics = { name: "Market" | "Style" | "Sector" | "Idiosyncratic"; riskShare: number; returnAttribution: number };
+export type FactorLayerAnalytics = { name: "Market" | "Style" | "Sector" | "Risk-free" | "Idiosyncratic"; riskShare: number; returnAttribution: number };
 export type FactorModelAnalytics = {
   factors: FactorAnalytics[];
   layers: FactorLayerAnalytics[];
@@ -160,6 +163,7 @@ export type FactorModelAnalytics = {
 export type FactorCorrelationDiagnostic = { factorA: string; factorB: string; correlation: number; groups: string };
 export type SecurityFactorExposure = { name: string; exposure: number };
 export type SecurityDecomposition = {
+  model?: "Published FF5 + momentum";
   dates: string[];
   observed: number[];
   systematic: number[];
@@ -837,6 +841,7 @@ export function buildRiskTargetStrategy(payload: MarketPayload, holdings: Analyt
 }
 
 export function buildFactorModel(payload: MarketPayload, analytics: PortfolioAnalytics, total: number): FactorModelAnalytics | null {
+  if(payload.academicFactors)return academicAttribution(payload,analytics,total)?.model??null;
   const dateSet = new Set(analytics.dates);
   const factorSeries = factorDefs.map((factor) => {
     const longMap = new Map(payload.series[factor.long]?.points.filter((point) => dateSet.has(point.date)).map((point) => [point.date, point.close]) ?? []);
@@ -940,6 +945,7 @@ function buildDecomposition(payload: MarketPayload, dates: string[], targetRetur
 }
 
 export function buildPortfolioDecomposition(payload: MarketPayload, analytics: PortfolioAnalytics) {
+  if(payload.academicFactors)return academicAttribution(payload,analytics,1)?.decomposition??null;
   return buildDecomposition(payload, analytics.dates, analytics.dailyReturns, analytics.curve);
 }
 
@@ -1004,6 +1010,7 @@ export function rollingPairwiseCorrelation(payload: MarketPayload, tickerA: stri
 }
 
 export function buildSecurityDrilldown(payload: MarketPayload, analytics: PortfolioAnalytics, ticker: string): SecurityDrilldownAnalytics | null {
+  if(payload.academicFactors)return academicSecurity(payload,analytics,ticker);
   const security = payload.series[ticker];
   const benchmark = payload.series.SPY;
   if (!security || !benchmark) return null;

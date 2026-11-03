@@ -8,13 +8,15 @@ export default function FactorExposureChart({ factors, comparison, label = "Curr
   const [hovered, setHovered] = useState<string | null>(null);
   const [pinned, setPinned] = useState<string | null>(null);
   const detailsId = useId();
-  const visible = factors.filter(factor => group === "All" || (group === "Sectors" ? factor.group === "Sector" : factor.group !== "Sector"));
+  const exposures = factors.filter(factor => factor.name !== "Risk-free");
+  const hasSectors = exposures.some(factor => factor.group === "Sector");
+  const visible = exposures.filter(factor => !hasSectors || group === "All" || (group === "Sectors" ? factor.group === "Sector" : factor.group !== "Sector"));
   const other = new Map(comparison?.map(factor => [factor.name, factor.exposure]));
   const selected = visible.find(factor => factor.name === (pinned ?? hovered));
   const signed = (value: number, digits = precision) => `${value >= 0 ? "+" : ""}${value.toFixed(digits)}`;
   function changeGroup(value: typeof group) { setGroup(value); setHovered(null); setPinned(null); }
   function exportValues() {
-    const rows: (string | number)[][] = [["factor", "group", "current_exposure", ...(comparison ? ["alternative_exposure", "change"] : [])], ...factors.map(factor => [factor.name, factor.group, factor.exposure, ...(comparison ? [other.get(factor.name) ?? 0, (other.get(factor.name) ?? 0) - factor.exposure] : [])])];
+    const rows: (string | number)[][] = [["factor", "group", "current_exposure", ...(comparison ? ["alternative_exposure", "change"] : [])], ...exposures.map(factor => [factor.name, factor.group, factor.exposure, ...(comparison ? [other.get(factor.name) ?? 0, (other.get(factor.name) ?? 0) - factor.exposure] : [])])];
     const csv = rows.map(row => row.map(value => typeof value === "number" ? String(value) : `"${value.replaceAll('"', '""')}"`).join(",")).join("\n");
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
     const link = document.createElement("a"); link.href = url; link.download = "factor-exposures.csv"; link.click();
@@ -26,7 +28,7 @@ export default function FactorExposureChart({ factors, comparison, label = "Curr
   const zero = x(0);
   return <article className="panel exposure-plot">
     <header className="panel-title"><h3>Factor exposures</h3><span>Regression sensitivities · beta units</span></header>
-    <div className="exposure-plot-controls"><div className="lab-tabs" role="tablist" aria-label="Factor exposure groups">{(["Core & style", "Sectors", "All"] as const).map(item => <button key={item} role="tab" aria-selected={group === item} className={group === item ? "active" : ""} onClick={() => changeGroup(item)}>{item}</button>)}</div><span><i className="current-key" />{label}</span>{comparison && <span><i className="alternative-key" />{comparisonLabel}</span>}<label className="exposure-precision">Precision<select aria-label="Exposure label precision" value={precision} onChange={event => setPrecision(Number(event.target.value))}><option value="2">2 decimals</option><option value="4">4 decimals</option><option value="6">6 decimals</option></select></label><button className="exposure-export" onClick={exportValues}>Export values</button></div>
+    <div className="exposure-plot-controls">{hasSectors && <div className="lab-tabs" role="tablist" aria-label="Factor exposure groups">{(["Core & style", "Sectors", "All"] as const).map(item => <button key={item} role="tab" aria-selected={group === item} className={group === item ? "active" : ""} onClick={() => changeGroup(item)}>{item}</button>)}</div>}<span><i className="current-key" />{label}</span>{comparison && <span><i className="alternative-key" />{comparisonLabel}</span>}<label className="exposure-precision">Precision<select aria-label="Exposure label precision" value={precision} onChange={event => setPrecision(Number(event.target.value))}><option value="2">2 decimals</option><option value="4">4 decimals</option><option value="6">6 decimals</option></select></label><button className="exposure-export" onClick={exportValues}>Export values</button></div>
     <div className={`exposure-inspector ${selected ? "inspecting" : ""}`} id={detailsId} role="status" aria-live="polite">
       {selected ? <><div className="exposure-inspector-name"><strong>{selected.name}</strong><small>{selected.group} · {pinned ? "Pinned" : "Hover details"}</small></div><div><span>{label}</span><b>{signed(selected.exposure, 6)}</b></div>{comparison && <><div><span>{comparisonLabel}</span><b className="alternative">{signed(other.get(selected.name) ?? 0, 6)}</b></div><div><span>Change</span><b>{signed((other.get(selected.name) ?? 0) - selected.exposure, 6)}</b></div></>}{pinned && <button aria-label="Clear selected factor" onClick={() => { setPinned(null); setHovered(null); }}>Clear</button>}</> : <p>Hover or focus a factor to inspect six decimal places. Click or tap to keep it selected. Export retains the underlying numerical values.</p>}
     </div>

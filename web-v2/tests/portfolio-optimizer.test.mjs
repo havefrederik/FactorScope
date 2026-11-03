@@ -32,3 +32,19 @@ test("new-name gross budgets count shorts and longs by absolute weight",()=>{
 test("conflicting individual bounds and net ranges cannot produce applicable weights",()=>{
   for(const config of [{netMin:1,netMax:0},{shortOnly:true},{positionBounds:[{min:.7,max:.4},{min:null,max:null}]},{newNameGrossCap:-1}]){const r=optimizePortfolio({...base,...config});assert.notEqual(r.status,"Solved");assert.deepEqual(r.weights,[]);}
 });
+
+test('a drifted portfolio gets an exact turnover-conflict explanation before solving',()=>{
+ const r=optimizePortfolio({...base,current:[.66,.34],positionCap:.5,turnoverCap:.3});
+ assert.equal(r.status,'Infeasible');close(r.minimumTurnover,.32,1e-12);assert.equal(r.turnoverLimit,.3);assert.equal(r.iterations,0);assert.deepEqual(r.weights,[]);
+ // A net range can make selling alone sufficient; this must not be called infeasible.
+ const ranged=optimizePortfolio({...base,current:[.66,.34],positionCap:.5,turnoverCap:.17,netMin:.8,netMax:1});assert.equal(ranged.status,'Solved',ranged.message);
+});
+test('minimum-turnover proof includes signed positions and individual bounds',()=>{
+ const r=optimizePortfolio({...base,current:[1.2,-.2],longOnly:false,positionCap:1,gross:2,turnoverCap:.3});assert.equal(r.status,'Infeasible');close(r.minimumTurnover,.4,1e-12);
+ const b=optimizePortfolio({...base,positionBounds:[{min:.7,max:null},{min:null,max:.3}],turnoverCap:.3});assert.equal(b.status,'Infeasible');close(b.minimumTurnover,.4,1e-12);
+});
+test('the reproduced February 2026 problem is infeasible at 30% turnover and solves at 32%',async()=>{
+ const {readFile}=await import('node:fs/promises');const fixture=JSON.parse(await readFile(new URL('./fixtures/weekly-turnover-conflict.json',import.meta.url),'utf8'));
+ const blocked=optimizePortfolio(fixture);assert.equal(blocked.status,'Infeasible');close(blocked.minimumTurnover,.31129474601718277,1e-10);
+ const allowed=optimizePortfolio({...fixture,turnoverCap:.32});assert.equal(allowed.status,'Solved',allowed.message);assert.ok(allowed.audit.every(a=>a.passed));assert.ok(allowed.turnover<=.320002);
+});

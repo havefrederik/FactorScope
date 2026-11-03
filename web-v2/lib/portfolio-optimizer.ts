@@ -1,7 +1,7 @@
 export type ExposureLimit={name:string;values:number[];min:number|null;max:number|null};
 export type OptimizerInput={covariance:number[][];current:number[];objective:"Minimum volatility"|"Maximum Sharpe"|"Minimum tracking error";expectedReturns?:number[];referenceWeights?:number[];longOnly:boolean;shortOnly?:boolean;net:number;netMin?:number;netMax?:number;gross:number;positionCap:number;positionBounds?:{min:number|null;max:number|null}[];newNameGrossCap?:number;turnoverCap:number|null;changeCap:number|null;locked:number[];exposures:ExposureLimit[]};
 export type OptimizerAudit={name:string;current:number;proposed:number;min:number|null;max:number|null;passed:boolean};
-export type OptimizerResult={status:"Solved"|"Invalid inputs"|"Not solved";message:string;weights:number[];volatility:number;currentVolatility:number;cash:number;gross:number;turnover:number;expectedReturn:number|null;assumedSharpe:number|null;audit:OptimizerAudit[];iterations:number;primalResidual:number;dualResidual:number};
+export type OptimizerResult={status:"Solved"|"Invalid inputs"|"Infeasible"|"Not solved";message:string;weights:number[];volatility:number;currentVolatility:number;cash:number;gross:number;turnover:number;expectedReturn:number|null;assumedSharpe:number|null;audit:OptimizerAudit[];iterations:number;primalResidual:number;dualResidual:number;minimumTurnover?:number;turnoverLimit?:number};
 const dot=(a:number[],b:number[])=>a.reduce((s,v,i)=>s+v*b[i],0);
 const multiply=(a:number[][],x:number[])=>a.map(row=>dot(row,x));
 const norm=(x:number[])=>Math.max(0,...x.map(Math.abs));
@@ -57,6 +57,22 @@ export function optimizePortfolio(input:OptimizerInput):OptimizerResult{
   if(!(average>0))return empty("Invalid inputs","Positive forecast variances are required.");
   const covariance=input.covariance.map((row,i)=>row.map((v,j)=>(v+input.covariance[j][i])/2));
   if(!cholesky(covariance.map((row,i)=>row.map((v,j)=>v+(i===j?average*1e-10:0)))))return empty("Invalid inputs","The covariance matrix must be positive semidefinite.");
+  // Exact minimum L1 trade for the intersection of position boxes and the net
+  // interval: first clamp each holding to its box, then repair the net budget.
+  // Other constraints can only increase this minimum, so exceeding the turnover
+  // cap proves infeasibility without interpreting an iteration limit as proof.
+  const bounds=input.current.map((w,i)=>{
+    let min=input.longOnly?0:-input.positionCap,max=input.shortOnly?0:input.positionCap;
+    const b=input.positionBounds?.[i];min=Math.max(min,b?.min??-Infinity);max=Math.min(max,b?.max??Infinity);
+    if(input.changeCap!==null){min=Math.max(min,w-input.changeCap);max=Math.min(max,w+input.changeCap);}
+    if(input.locked.includes(i)){min=Math.max(min,w);max=Math.min(max,w);}
+    return {min,max};
+  });
+  for(let i=0;i<n;i++)if(bounds[i].min>bounds[i].max+1e-12)return empty("Invalid inputs",`Position ${i+1} conflicts with its lock, side or position limits.`);
+  if(sum(bounds.map(b=>b.min))>netMax+1e-10||sum(bounds.map(b=>b.max))<netMin-1e-10)return empty("Invalid inputs","Position bounds and locks cannot reach the requested net exposure.");
+  const nearest=input.current.map((w,i)=>Math.max(bounds[i].min,Math.min(bounds[i].max,w)));
+  const nearestNet=sum(nearest),minimumTurnover=sum(nearest.map((w,i)=>Math.abs(w-input.current[i])))+Math.max(0,netMin-nearestNet,nearestNet-netMax);
+  if(input.turnoverCap!==null&&minimumTurnover>input.turnoverCap+1e-8)return {...empty("Infeasible",`Restoring the position bounds and net exposure requires at least ${(minimumTurnover*100).toFixed(2)}% traded weight, above the ${(input.turnoverCap*100).toFixed(2)}% turnover limit. No feasible rebalance exists under these limits.`),minimumTurnover,turnoverLimit:input.turnoverCap};
   const scaleIndex=sharpe?n:-1,grossIndex=n+(sharpe?1:0),tradeIndex=grossIndex+n,dimension=tradeIndex+(input.turnoverCap===null?0:n);
   const p=Array.from({length:dimension},(_,i)=>Array.from({length:dimension},(_,j)=>i<n&&j<n?2*covariance[i][j]/average:0));
   const q=Array.from({length:dimension},(_,i)=>tracking&&i<n?-2*dot(covariance[i],reference)/average:0);
@@ -74,11 +90,7 @@ export function optimizePortfolio(input:OptimizerInput):OptimizerResult{
     const budget=vector();for(let i=0;i<n;i++)budget[i]=1;bound(budget,netMin,netMax);
     for(let i=0;i<n;i++){
       const v=vector();v[i]=1;
-      let lower=input.longOnly?0:-input.positionCap,upper=input.shortOnly?0:input.positionCap;
-      const individual=input.positionBounds?.[i];if(individual){lower=Math.max(lower,individual.min??-Infinity);upper=Math.min(upper,individual.max??Infinity);}
-      if(input.changeCap!==null){lower=Math.max(lower,input.current[i]-input.changeCap);upper=Math.min(upper,input.current[i]+input.changeCap);}
-      if(input.locked.includes(i)){lower=Math.max(lower,input.current[i]);upper=Math.min(upper,input.current[i]);}
-      if(lower>upper+1e-12)return empty("Invalid inputs",`Position ${i+1} conflicts with its lock, side or position limits.`);
+      const {min:lower,max:upper}=bounds[i];
       bound(v,lower,upper);
       const plus=vector();plus[i]=1;plus[grossIndex+i]=-1;row(plus,-Infinity,0);
       const minus=vector();minus[i]=-1;minus[grossIndex+i]=-1;row(minus,-Infinity,0);
@@ -92,7 +104,7 @@ export function optimizePortfolio(input:OptimizerInput):OptimizerResult{
   }catch{return empty("Invalid inputs","An exposure constraint contradicts the available asset exposures.");}
   const initial=vector();input.current.forEach((v,i)=>{initial[i]=v;initial[grossIndex+i]=Math.abs(v);});if(sharpe)initial[scaleIndex]=1;
   const solved=quadraticProgram(p,q,a,lo,hi,initial);
-  if(!solved||solved.iteration>=12000)return empty("Not solved","The solver did not converge. The limits may conflict; relax them and run again. No proposal has been applied.");
+  if(!solved||solved.iteration>=12000)return {...empty("Not solved","The numerical solver did not reach its accuracy requirements. This does not establish that the limits conflict. No proposal has been applied."),iterations:solved?.iteration??0,primalResidual:solved?.primalResidual??Infinity,dualResidual:solved?.dualResidual??Infinity};
   const t=sharpe?solved.x[scaleIndex]:1,weights=solved.x.slice(0,n).map(v=>v/t);
   if(!weights.every(Number.isFinite)||!(t>0))return empty("Not solved","Numerical failure; no proposal has been applied.");
   const audit:OptimizerAudit[]=[];

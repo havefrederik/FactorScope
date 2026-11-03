@@ -35,3 +35,19 @@ test('a rejected trade does not start a holding lock and invalid session counts 
  const r=await backtestOptimizer(payload,['A','B'],dates[0],dates.at(-1),[.5,.5],{...policy,interval:'Daily',costGate:true,costBps:1000,minHoldingSessions:21},input);assert.equal(r.decisions,4);assert.equal(r.holdingChecksSkipped,0);
  for(const minHoldingSessions of [-1,1.5,NaN])await assert.rejects(()=>backtestOptimizer(payload,['A','B'],dates[0],dates.at(-1),[.5,.5],{...policy,minHoldingSessions},input),/whole trading-session/);
 });
+
+test('infeasible rebalance is recorded without trading, charging costs, or resetting the hold clock',async()=>{
+ const seen=[];const run=await backtestOptimizer(payload,['A','B'],dates[0],dates.at(-1),[.66,.34],{...policy,interval:'Daily',minHoldingSessions:3,costBps:5},(d,w)=>{seen.push(d);return {...input(d,w),positionCap:.5,turnoverCap:d===dates[0]?.3:1};});
+ assert.equal(run.events[0].status,'Skipped: infeasible limits');assert.equal(run.events[0].executionDate,'');assert.equal(run.events[0].cost,0);assert.equal(run.events[0].turnover,0);assert.ok(Math.abs(run.events[0].minimumTurnover-.32)<1e-12);
+ assert.equal(seen[1],dates[1]);assert.equal(run.events[1].status,'Traded');assert.equal(run.events[1].decisionDate,dates[1]);assert.equal(run.events[1].executionDate,dates[2]);assert.ok(Math.abs(run.curve[1]-1.066)<1e-12);
+});
+test('users can stop on infeasibility and invalid model inputs still stop rather than silently skip',async()=>{
+ await assert.rejects(()=>backtestOptimizer(payload,['A','B'],dates[0],dates.at(-1),[.66,.34],{...policy,infeasibleAction:'Stop the run'},(d,w)=>({...input(d,w),positionCap:.5,turnoverCap:.3})),/2026-01-29:.*32.00%.*30.00%.*stopped as requested/);
+ await assert.rejects(()=>backtestOptimizer(payload,['A','B'],dates[0],dates.at(-1),[.5,.5],policy,(d,w)=>({...input(d,w),covariance:[[NaN,0],[0,.1]]})),/incomplete results are not saved/);
+});
+test('cost valuations have stated units, scale with preferences and match recorded decision values',async()=>{
+ const {riskReductionValue}=await import('../lib/optimizer-backtest.ts');
+ const value=riskReductionValue(.3**2,.28**2,3,21);assert.ok(Math.abs(value-.00145)<1e-12);assert.equal(riskReductionValue(.09,.0784,6,21),2*riskReductionValue(.09,.0784,3,21));assert.ok(riskReductionValue(.04,.09,3,21)<0);
+ const r=await backtestOptimizer(payload,['A','B'],dates[0],dates.at(-1),[.5,.5],{...policy,costGate:true,costBps:1000},input);
+ const e=r.events[0];assert.ok(e.riskBenefit>0);assert.ok(e.estimatedCost>e.riskBenefit);assert.equal(e.cost,0);assert.equal(e.status,'Skipped: cost gate');assert.ok(Math.abs(e.currentVolatility-Math.sqrt(.025))<1e-10);
+});

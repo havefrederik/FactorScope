@@ -1,3 +1,4 @@
+import {tradingFactorCovariance,validateForecastOptions,horizonLabel,type ForecastOptions} from './forecast-horizon.ts';
 import {hybridRisk} from './shrinkage-risk.ts';
 import {summarizeCovariance} from './covariance-comparison.ts';
 import type {MarketPayload,CovarianceForecastAnalytics} from './analytics.ts';
@@ -30,7 +31,8 @@ export function timeSeriesExposures(assets:number[][],factors:number[][]){
  }
  return assets.map(raw=>{const y=center(raw),b=Q.map(q=>dot(q,y));for(let i=b.length-1;i>=0;i--){for(let j=i+1;j<b.length;j++)b[i]-=R[i][j]*b[j];b[i]/=R[i][i];}return b;});
 }
-export function academicRisk(payload:MarketPayload,base:CovarianceForecastAnalytics,weights:number[],data:AcademicFactors,namedSelection:number[]=data.names.map((_,i)=>i),selected:number[]=[],shrinkageOverride:number|null=null){
+export function academicRisk(payload:MarketPayload,base:CovarianceForecastAnalytics,weights:number[],data:AcademicFactors,namedSelection:number[]=data.names.map((_,i)=>i),selected:number[]=[],shrinkageOverride:number|null=null,forecastOptions:ForecastOptions={sessions:1,weighting:'Equal-weight'}){
+ validateForecastOptions(forecastOptions);
  if(base.asOf>data.through)throw Error(`French factors end on ${data.through}. Choose that date or earlier.`);
  validateAcademicFactors(data);
  const factorIndex=new Map(data.rows.map((r,i)=>[r.date,i]));
@@ -41,9 +43,12 @@ export function academicRisk(payload:MarketPayload,base:CovarianceForecastAnalyt
   if(priorFactor<0||data.rows[priorFactor].date!==previous)throw Error('Stock return interval crosses a missing French session.');
   return points[i].close/points[i-1].close-1-r.rf;});});
  if(new Set(namedSelection).size!==namedSelection.length||namedSelection.some(i=>!Number.isInteger(i)||i<0||i>=data.names.length))throw Error('Choose available academic factors.');
- const f=namedSelection.map(k=>rows.map(r=>r.values[k])),betas=timeSeriesExposures(assets,f),fit=hybridRisk(assets,f,selected,shrinkageOverride),matrix=fit.covariance.map(r=>r.map(v=>252*v));
- const specificVolatility=fit.specificVolatility;
- return {forecast:{...base,...summarizeCovariance(matrix,base.tickers,weights),observations:252,expertWeights:[],modelLabel:`Fama–French (${namedSelection.length}) + statistical factors (${selected.length}) · residual shrinkage`,shrinkage:fit.shrinkage},components:fit.components,specificVolatility,
+ const f=namedSelection.map(k=>rows.map(r=>r.values[k])),betas=timeSeriesExposures(assets,f),fit=hybridRisk(assets,f,selected,shrinkageOverride);
+ const factorRows=data.rows.filter(r=>r.date<=base.asOf).slice(-1008);
+ const responsive=forecastOptions.weighting==='Responsive'?tradingFactorCovariance(betas,namedSelection.map(k=>factorRows.map(r=>r.values[k])),fit.panels.statistical,fit.panels.specific,fit.residualCovariance,forecastOptions.sessions):null;
+ const matrix=(responsive?.covariance??fit.covariance).map(r=>r.map(v=>252*v));
+ const specificVolatility=responsive?.specificVolatility??fit.specificVolatility;
+ return {forecast:{...base,...summarizeCovariance(matrix,base.tickers,weights),observations:252,forecastSessions:forecastOptions.sessions,horizon:horizonLabel(forecastOptions.sessions),forecastMethod:forecastOptions.weighting==='Responsive'?'Responsive factor risk':'Constant covariance scaling',factorRiskObservations:factorRows.length,expertWeights:[],modelLabel:`Fama–French (${namedSelection.length}) + statistical factors (${selected.length}) · ${forecastOptions.weighting==='Responsive'?'responsive risk':'residual shrinkage'}`,shrinkage:fit.shrinkage},components:fit.components,specificVolatility,
   factors:namedSelection.map((id,k)=>({name:`French: ${data.names[id]}`,group:id===0?'Core':'Style',unit:'time-series beta',asOf:base.asOf,values:betas.map(b=>b[k])}))};
 }
 

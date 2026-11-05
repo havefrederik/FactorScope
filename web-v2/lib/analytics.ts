@@ -122,7 +122,10 @@ export type CovarianceForecastAnalytics = CovarianceSnapshot & {
   modelLabel?: string;
   shrinkage?: number;
   asOf: string;
-  horizon: "Next trading session";
+  horizon: string;
+  forecastSessions?: number;
+  forecastMethod?: string;
+  factorRiskObservations?: number;
   observations: number;
   tickers: string[];
   expertWeights: StrategyExpertWeight[];

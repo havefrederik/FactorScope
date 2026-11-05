@@ -1,4 +1,5 @@
 "use client";
+import {horizonLabel,horizonVolatility} from "@/lib/forecast-horizon";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { buildAnalytics, type CovarianceForecastAnalytics, type MarketPayload, type PortfolioAnalytics } from "@/lib/analytics";
 import { comparisonHoldings, comparisonPresetWeights, replayStatistics, type ComparisonPreset } from "@/lib/comparison-portfolio";
@@ -62,7 +63,8 @@ export default function PortfolioComparisonWorkspace({ onAdopt, initialWeights, 
   const relativeBase=construction?.current.signalRisk;
   const riskMetrics = construction ? [
     ...(snapshot?.relativeSignals?[{label:"Relative signal / risk index · current = 100",a:relativeBase&&relativeBase>1e-12?100:null,b:relativeBase&&relativeBase>1e-12&&construction.alternative.signalRisk!==null?100*construction.alternative.signalRisk/relativeBase:null,percent:false}]:[]),
-    { label: "Forecast annual volatility", a: construction.current.volatility, b: construction.alternative.volatility, percent: true },
+    { label: `Forecast volatility · ${horizonLabel(snapshot?.forecast.forecastSessions??1).toLowerCase()}`, a: horizonVolatility(construction.current.volatility,snapshot?.forecast.forecastSessions??1), b: horizonVolatility(construction.alternative.volatility,snapshot?.forecast.forecastSessions??1), percent: true },
+    { label: "Forecast volatility · annualized", a: construction.current.volatility, b: construction.alternative.volatility, percent: true },
     ...(snapshot?.expectedReturns ? [
       { label: "Assumed annual excess return", a: construction.current.expectedReturn, b: construction.alternative.expectedReturn, percent: true },
       { label: "Expected Sharpe · manual forecasts", a: construction.current.assumedSharpe, b: construction.alternative.assumedSharpe, percent: false },

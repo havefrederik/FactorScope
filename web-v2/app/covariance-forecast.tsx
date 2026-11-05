@@ -1,5 +1,6 @@
 "use client";
 
+import {forecastHorizons,horizonLabel,horizonVolatility} from "../lib/forecast-horizon";
 import { useState } from "react";
 import type { CovarianceForecastAnalytics } from "../lib/analytics";
 import { compareCovariance } from "../lib/covariance-comparison";
@@ -9,6 +10,7 @@ const vol = (value: number) => `${(value * 100).toFixed(1)}%`;
 const corr = (value: number | null) => value === null ? "—" : value.toFixed(2);
 
 export default function CovarianceForecastPanel({ forecast }: { forecast: CovarianceForecastAnalytics | null }) {
+  const [sessions,setSessions]=useState(5);
   const [referenceId, setReferenceId] = useState("historical-63");
   const [mode, setMode] = useState<"Correlation" | "Covariance">("Correlation");
   const [view, setView] = useState<"Change" | "Reference" | "Forecast">("Change");
@@ -39,13 +41,13 @@ export default function CovarianceForecastPanel({ forecast }: { forecast: Covari
   const orderedSecurities = forecast.securities.map((item, i) => ({ ...item, index: i, change: item.volatility - reference.volatilities[i] })).sort((a, b) => Math.abs(b.change) - Math.abs(a.change));
   return <section className="covariance-layout covariance-comparison">
     <article className="panel covariance-comparison-summary">
-      <div className="covariance-comparison-heading"><div><h2>What changes in the risk forecast?</h2><p>CM-IEWMA · data through {forecast.asOf} · next trading session</p></div><label>COMPARE WITH<select aria-label="Covariance comparison reference" value={reference.id} onChange={event => setReferenceId(event.target.value)}>{forecast.references.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label></div>
+      <div className="covariance-comparison-heading"><div><h2>What changes in the risk forecast?</h2><p>CM-IEWMA · data through {forecast.asOf} · {horizonLabel(sessions).toLowerCase()}</p></div><label>RISK HORIZON<select aria-label="Covariance forecast horizon" value={sessions} onChange={e=>setSessions(Number(e.target.value))}>{forecastHorizons.map(n=><option key={n} value={n}>{horizonLabel(n)}</option>)}</select></label><label>COMPARE WITH<select aria-label="Covariance comparison reference" value={reference.id} onChange={event => setReferenceId(event.target.value)}>{forecast.references.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label></div>
       <div className="covariance-risk-comparison" aria-live="polite">
-        <div><span>REFERENCE PORTFOLIO RISK</span><strong>{vol(reference.portfolioVolatility)}</strong><small>{previous ? `Forecast made after ${reference.asOf}` : `${reference.observations} sessions · ${reference.startDate} — ${reference.asOf}`}</small></div>
-        <div><span>NEXT-SESSION FORECAST RISK</span><strong>{vol(forecast.portfolioVolatility)}</strong><small>Annualized · same current portfolio weights</small></div>
-        <div><span>{previous ? "FORECAST REVISION" : "FORECAST − HISTORICAL ESTIMATE"}</span><strong>{signed(comparison.totalChange * 100)} pp</strong><small>{reference.portfolioVolatility > 1e-12 ? `${signed(comparison.totalChange / reference.portfolioVolatility * 100, 1)}% relative difference` : "Relative difference unavailable"}</small></div>
+        <div><span>REFERENCE PORTFOLIO RISK</span><strong>{vol(horizonVolatility(reference.portfolioVolatility,sessions))}</strong><small>{previous ? `Forecast made after ${reference.asOf}` : `${reference.observations} sessions · ${reference.startDate} — ${reference.asOf}`}</small></div>
+        <div><span>FORECAST RISK · {sessions} {sessions===1?"SESSION":"SESSIONS"}</span><strong>{vol(horizonVolatility(forecast.portfolioVolatility,sessions))}</strong><small>{vol(forecast.portfolioVolatility)} annualized · same weights</small></div>
+        <div><span>{previous ? "FORECAST REVISION" : "FORECAST − HISTORICAL ESTIMATE"}</span><strong>{signed(horizonVolatility(comparison.totalChange,sessions) * 100)} pp</strong><small>{reference.portfolioVolatility > 1e-12 ? `${signed(comparison.totalChange / reference.portfolioVolatility * 100, 1)}% relative difference` : "Relative difference unavailable"}</small></div>
       </div>
-      <p className="covariance-comparison-note">{previous ? "Compares consecutive next-session forecasts: the earlier forecast targeted the last observed session, the latest targets the next session." : "The reference is a sample covariance of recent daily returns, not a known current covariance. Its difference from the forecast is not a predicted change from an observed true state."} Current weights are held fixed, including shorts and zero-risk cash. Annualization (252 sessions) is a reporting convention, not a one-year forecast.</p>
+      <p className="covariance-comparison-note">{previous ? "Compares consecutive next-session forecasts: the earlier forecast targeted the last observed session, the latest targets the next session." : "The reference is a sample covariance of recent daily returns, not a known current covariance. Its difference from the forecast is not a predicted change from an observed true state."} Risk above is expressed over {sessions} sessions using constant-covariance scaling. Correlations do not change with this scaling. The matrices and detailed breakdown below remain annualized. Responsive factor forecasts are available in Optimizer.</p>
     </article>
 
     <article className="panel covariance-drivers"><header><h2>Why portfolio risk differs</h2><span>Contributions to {signed(comparison.totalChange * 100)} pp</span></header><div className="covariance-driver-list">{drivers.map(item => <div key={item.label}><span>{item.label}</span><div className="covariance-driver-track"><i style={{ left: item.value !== null && item.value < 0 ? `${50 - Math.abs(item.value) / driverScale * 50}%` : "50%", width: `${Math.abs(item.value ?? 0) / driverScale * 50}%`, background: (item.value ?? 0) < 0 ? "#829dff" : "#f3b456" }} /></div><strong>{item.value === null ? "—" : `${signed(item.value * 100)} pp`}</strong></div>)}</div><p className="covariance-comparison-note">The volatility and correlation effects sum to the risk difference before rounding. Each effect averages both replacement orders; this is an accounting decomposition, not a causal explanation. Unavailable when a reference variance is zero.</p></article>

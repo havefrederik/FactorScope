@@ -1,3 +1,4 @@
+import {calibrateRisk,type RiskCheck} from './forecast-calibration.ts';
 import type { MarketPayload } from './analytics.ts';
 import { optimizePortfolio, type OptimizerInput } from './portfolio-optimizer.ts';
 export type ReoptimizationPolicy={infeasibleAction?:'Hold existing positions'|'Stop the run';interval:'Once'|'Daily'|'Weekly'|'Monthly'|'Quarterly'|'Every N sessions';minHoldingSessions?:number;intervalSessions?:number;trigger:'Interval'|'Weight drift'|'Volatility ceiling'|'Interval or threshold';drift:number;volatility:number;costBps:number;costGate:boolean;riskAversion:number;horizon:number;borrowRate:number;financingRate:number};
@@ -23,6 +24,7 @@ export async function backtestOptimizer(payload:MarketPayload,tickers:string[],s
  if(dates.some(d=>!(cashPrices.get(d)!>0)))throw Error('The test requires a complete BIL cash benchmark.');
  if(initial.length!==tickers.length||initial.some(v=>!Number.isFinite(v)))throw Error('Invalid starting allocation.');
  let values=initial.slice(),cash=1-initial.reduce((s,v)=>s+v,0),nav=1,lastTarget=initial.slice(),pending:{date:string;target:number[];vol:number;review:Pick<ReoptimizationEvent,'currentVolatility'|'riskBenefit'|'estimatedCost'>}|null=null;
+ const riskChecks:RiskCheck[]=[];
  const curve=[1],events:ReoptimizationEvent[]=[],weightsHistory=[initial.slice()];let decisions=0,totalCosts=0,lastExecution=-Infinity,holdingChecksSkipped=0;
  for(let d=0;d<dates.length;d++){
   if(d>0){const previous=dates[d-1];values=values.map((v,i)=>v*prices[i].get(dates[d])!/prices[i].get(previous)!);
@@ -51,6 +53,7 @@ export async function backtestOptimizer(payload:MarketPayload,tickers:string[],s
   const breached=needsRisk&&Math.sqrt(Math.max(0,variance(current,input!.covariance)))>policy.volatility;
   const trigger=d===0||policy.interval!=='Once'&&(policy.trigger==='Interval'?scheduled:policy.trigger==='Weight drift'?drift:policy.trigger==='Volatility ceiling'?breached:scheduled||drift||breached);
   if(trigger){input??=model(dates[d],current);decisions++;
+   riskChecks.push({index:d,sessions:input.riskHorizonSessions??1,weights:current.slice(),annualVariance:variance(current,input.covariance),excess:input.riskReturnBasis==='excess'});
    const solved=optimizePortfolio(input);
    if(solved.status==='Infeasible'){
     if(policy.infeasibleAction==='Stop the run')throw Error(`${dates[d]}: ${solved.message} The run stopped as requested; incomplete results are not saved.`);
@@ -68,5 +71,7 @@ export async function backtestOptimizer(payload:MarketPayload,tickers:string[],s
   }
   if(d%10===0){onProgress?.(d/dates.length);await new Promise<void>(resolve=>setTimeout(resolve,0));}
  }
- onProgress?.(1);return {dates,curve,dailyReturns:curve.slice(1).map((v,i)=>v/curve[i]-1),events,decisions,totalCosts,holdingChecksSkipped,weightsHistory};
+ const rf=new Map(payload.academicFactors?.rows.map(r=>[r.date,r.rf])??[]);
+ const calibration=calibrateRisk(riskChecks,dates,prices.map(map=>dates.slice(1).map((date,i)=>map.get(date)!/map.get(dates[i])!-1)),dates.slice(1).map(d=>rf.get(d)));
+ onProgress?.(1);return {calibration,dates,curve,dailyReturns:curve.slice(1).map((v,i)=>v/curve[i]-1),events,decisions,totalCosts,holdingChecksSkipped,weightsHistory};
 }

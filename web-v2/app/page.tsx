@@ -656,7 +656,7 @@ export default function Home() {
         </div>}
 
         {(dataError||missingHoldings.length>0)&&<div className={`prototype-note ${dataError ? "prototype-error" : missingHoldings.length ? "prototype-warning" : ""}`}><span>{dataError ? dataErrorKind === "request" ? "INVALID REQUEST" : "CONNECTION ISSUE" : missingHoldings.length ? "PARTIAL DATA" : "LIVE DEMO"}</span><p>{dataError ? dataErrorKind === "request" ? dataError : `${dataError} The interface remains available; retry the connection when ready.` : missingHoldings.length ? `No usable Yahoo history for ${missingHoldings.join(", ")}. Analytics exclude those positions and retain their value in portfolio cash.` : `USD portfolio analytics calculated from Yahoo Finance daily adjusted prices${marketData?.asOf ? ` through ${marketData.asOf}` : ""}.`}</p>{dataError && <button onClick={loadMarketData}>Retry</button>}</div>}
-        <div className={`page-head ${primarySection==="Portfolio"||primarySection==="Risk & Attribution"?"compact-page-head":""}`}>
+        <div className={primarySection === "About" ? "page-head" : "sr-only"}>
           <div className="page-heading-copy"><span className="kicker">{view === "Overview" ? "LIVE PORTFOLIO INTELLIGENCE" : `FACTORSCOPE / ${primarySection.toUpperCase()}`}</span><h1>{displayedViewCopy[0]}</h1><p>{displayedViewCopy[1]}</p></div>
 
         </div>

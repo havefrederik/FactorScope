@@ -91,7 +91,7 @@ test("CM-IEWMA follows the published stock-universe specification", async () => 
   assert.doesNotMatch(page, /Rolling 126-day/);
   assert.match(page, /Johansson, Ogut, Pelger, Schmelzer and Boyd/);
   assert.match(page, /github\.com\/cvxgrp\/cov_pred_finance/);
-  assert.match(page, /Covariance Forecast/);
-  assert.match(page, /CM-IEWMA covariance forecast/);
+  assert.match(page, /Risk & Correlation Forecast/);
+  assert.match(page, /CM-IEWMA \{mode.toLowerCase\(\)\} forecast/);
   assert.match(page, /FORECAST AS OF/);
 });

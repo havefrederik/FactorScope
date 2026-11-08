@@ -12,12 +12,24 @@ export const qualityModels = [
 export type QualityModelId = typeof qualityModels[number]['id'];
 export type QualityInput = { payload: MarketPayload; tickers: string[]; weights: number[]; asOf: string; sessions: ForecastSessions };
 export type QualityObservation = { loss: number; predictedRisk: number; realizedReturn: number; standardizedReturn: number | null };
-export type QualityPoint = { asOf: string; through: string; expertWeights: number[]; estimates: Record<QualityModelId, QualityObservation> };
+export type QualityPoint = { asOf: string; through: string; expertWeights: number[]; estimates: Record<QualityModelId, QualityObservation>; correlationEstimates: Record<QualityModelId, QualityObservation>; commonVolatilities: number[] };
+type QualitySummary = { id: QualityModelId; loss: number; lossVsLw: number; calibration: number | null; coverage: number | null; count: number };
 export type QualityResult = {
   sessions: number; tickers: string[]; weights: number[]; startDate: string; endDate: string;
-  points: QualityPoint[]; summaries: { id: QualityModelId; loss: number; lossVsLw: number; calibration: number | null; coverage: number | null; count: number }[];
-  quarters: { quarter: string; count: number; differences: Record<QualityModelId, number> }[];
+  points: QualityPoint[]; summaries: QualitySummary[]; correlationSummaries: QualitySummary[];
+  quarters: { quarter: string; count: number; differences: Record<QualityModelId, number>; correlationDifferences: Record<QualityModelId, number> }[];
 };
+
+/** Retain a model's correlations, replacing its marginal scales with a shared forecast.
+ * The caller must supply volatilities estimated before the outcome window.
+ * Positive diagonal congruence preserves positive definiteness; scoring still checks it.
+ */
+export function withCommonVolatility(matrix: number[][], volatilities: number[]): number[][] {
+  const n = volatilities.length;
+  if (!n || matrix.length !== n || matrix.some((r, i) => r.length !== n || r.some(v => !Number.isFinite(v)) || !(r[i] > 0)) || volatilities.some(v => !Number.isFinite(v) || !(v > 0))) throw Error('Correlation scoring requires positive finite variances and shared volatility forecasts.');
+  const scales = matrix.map((r, i) => Math.sqrt(r[i]));
+  return matrix.map((r, i) => r.map((v, j) => i === j ? volatilities[i] ** 2 : v / scales[i] / scales[j] * volatilities[i] * volatilities[j]));
+}
 
 /** Strict Gaussian score. Do not silently repair a failed covariance and score a different model. */
 export function gaussianLoss(matrix: number[][], observed: number[]) {
@@ -79,7 +91,11 @@ export function evaluateCovarianceForecasts(input: QualityInput, progress: (done
     const observed = returns.map(r => r.slice(origin, origin + sessions).reduce((s, v) => s + v, 0));
     const matrices = { cm: cm.covarianceMatrix, ff: ff.covarianceMatrix, lw, iewma };
     const estimates = Object.fromEntries(qualityModels.map(m => [m.id, scoreForecast(matrices[m.id], observed, weights, sessions)])) as QualityPoint['estimates'];
-    points.push({ asOf, through: dates[origin + sessions], expertWeights: cm.weights.map(w => w.weight), estimates });
+    // Fixed ex-ante reference: the 63-session volatility stage of the single IEWMA.
+    // Same security scales, dates, outcomes and horizon for every correlation model.
+    const commonVolatilities = iewma.map((r, i) => Math.sqrt(r[i]));
+    const correlationEstimates = Object.fromEntries(qualityModels.map(m => [m.id, scoreForecast(withCommonVolatility(matrices[m.id], commonVolatilities), observed, weights, sessions)])) as QualityPoint['estimates'];
+    points.push({ asOf, through: dates[origin + sessions], expertWeights: cm.weights.map(w => w.weight), estimates, correlationEstimates, commonVolatilities });
     progress(points.length, total);
   }
   return summarizeQuality(points, input);
@@ -88,13 +104,14 @@ export function evaluateCovarianceForecasts(input: QualityInput, progress: (done
 export function summarizeQuality(points: QualityPoint[], input: Pick<QualityInput, 'sessions' | 'tickers' | 'weights'>): QualityResult {
   if (!points.length) throw Error('No complete forecast evaluation windows.');
   const mean = (values: number[]) => values.reduce((s, v) => s + v, 0) / values.length;
-  const summaries = qualityModels.map(m => {
-    const z = points.map(p => p.estimates[m.id].standardizedReturn).filter((v): v is number => v !== null);
-    return { id: m.id, loss: mean(points.map(p => p.estimates[m.id].loss)), lossVsLw: mean(points.map(p => p.estimates[m.id].loss - p.estimates.lw.loss)),
+  const summarize = (field: 'estimates' | 'correlationEstimates') => qualityModels.map(m => {
+    const z = points.map(p => p[field][m.id].standardizedReturn).filter((v): v is number => v !== null);
+    return { id: m.id, loss: mean(points.map(p => p[field][m.id].loss)), lossVsLw: mean(points.map(p => p[field][m.id].loss - p[field].lw.loss)),
       calibration: z.length >= 20 ? Math.sqrt(mean(z.map(v => v * v))) : null, coverage: z.length >= 20 ? mean(z.map(v => Math.abs(v) <= 1.96 ? 1 : 0)) : null, count: points.length };
   });
   const groups = new Map<string, QualityPoint[]>();
   for (const p of points) { const q = `${p.through.slice(0,4)} Q${Math.ceil(Number(p.through.slice(5,7)) / 3)}`; groups.set(q, [...(groups.get(q) ?? []), p]); }
-  const quarters = [...groups].map(([quarter, rows]) => ({ quarter, count: rows.length, differences: Object.fromEntries(qualityModels.map(m => [m.id, mean(rows.map(p => p.estimates[m.id].loss - p.estimates.lw.loss))])) as Record<QualityModelId, number> }));
-  return { sessions: input.sessions, tickers: [...input.tickers], weights: [...input.weights], startDate: points[0].asOf, endDate: points.at(-1)!.through, points, summaries, quarters };
+  const differences = (rows: QualityPoint[], field: 'estimates' | 'correlationEstimates') => Object.fromEntries(qualityModels.map(m => [m.id, mean(rows.map(p => p[field][m.id].loss - p[field].lw.loss))])) as Record<QualityModelId, number>;
+  const quarters = [...groups].map(([quarter, rows]) => ({ quarter, count: rows.length, differences: differences(rows, 'estimates'), correlationDifferences: differences(rows, 'correlationEstimates') }));
+  return { sessions: input.sessions, tickers: [...input.tickers], weights: [...input.weights], startDate: points[0].asOf, endDate: points.at(-1)!.through, points, summaries: summarize('estimates'), correlationSummaries: summarize('correlationEstimates'), quarters };
 }

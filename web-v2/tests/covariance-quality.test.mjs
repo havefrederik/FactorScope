@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { evaluateCovarianceForecasts, gaussianLoss, scoreForecast, qualityPanel, summarizeQuality, qualityModels } from '../lib/covariance-quality.ts';
+import { evaluateCovarianceForecasts, gaussianLoss, scoreForecast, withCommonVolatility, qualityPanel, summarizeQuality, qualityModels } from '../lib/covariance-quality.ts';
+import { buildIewmaExpertSnapshots } from '../lib/analytics.ts';
 import { ledoitWolf } from '../lib/shrinkage-risk.ts';
 import { academicRisk } from '../lib/academic-factors.ts';
 const close=(a,b,tol=1e-10)=>assert.ok(Math.abs(a-b)<tol,`${a} != ${b}`);
@@ -39,6 +40,7 @@ test('Evaluation windows follow 500 prior returns, never overlap, and drop the i
   for(let i=1;i<r.points.length;i++)assert.equal(r.points[i].asOf,r.points[i-1].through);
   assert.ok(r.summaries.every(s=>s.count===10&&s.calibration===null&&s.coverage===null));
   assert.equal(r.summaries.find(s=>s.id==='lw').lossVsLw,0);
+  assert.equal(r.correlationSummaries.find(s=>s.id==='lw').lossVsLw,0);
   assert.ok(r.points.every(p=>Math.abs(p.expertWeights.reduce((a,b)=>a+b,0)-1)<1e-8));
   assert.equal(r.quarters.reduce((s,q)=>s+q.count,0),10);
 });
@@ -50,6 +52,11 @@ test('Held-out forecasts match standalone model estimates at their actual format
   assert.deepEqual(p.estimates.lw,scoreForecast(lw,realized,input.weights,5));
   const ff=academicRisk(input.payload,{asOf:panel.dates[500],tickers:input.tickers},input.weights,input.payload.academicFactors,undefined,[],null,{sessions:5,weighting:'Responsive'}).forecast;
   assert.deepEqual(p.estimates.ff,scoreForecast(ff.covarianceMatrix,realized,input.weights,5));
+  const single=buildIewmaExpertSnapshots(panel.returns)[2][499].covariance;
+  const common=single.map((r,i)=>Math.sqrt(r[i]*252));
+  assert.deepEqual(p.commonVolatilities,common);
+  assert.deepEqual(p.correlationEstimates.ff,scoreForecast(withCommonVolatility(ff.covarianceMatrix,common),realized,input.weights,5));
+  for(const k of ['loss','predictedRisk','standardizedReturn'])close(p.correlationEstimates.iewma[k],p.estimates.iewma[k]);
 });
 
 test('Appending or changing future stock and factor observations cannot change earlier evaluation results',()=>{
@@ -72,9 +79,50 @@ test('Incomplete coverage and malformed histories fail explicitly instead of bri
 
 test('Calibration is zero-mean RMS, coverage uses 1.96, and both require twenty windows',()=>{
   const estimates=Object.fromEntries(qualityModels.map(m=>[m.id,{loss:0,predictedRisk:1,realizedReturn:2,standardizedReturn:2}]));
-  const points=Array.from({length:20},(_,i)=>({asOf:`2024-01-${String(i+1).padStart(2,'0')}`,through:'2024-02-01',expertWeights:[1,0,0,0,0],estimates}));
+  const points=Array.from({length:20},(_,i)=>({asOf:`2024-01-${String(i+1).padStart(2,'0')}`,through:'2024-02-01',expertWeights:[1,0,0,0,0],estimates,correlationEstimates:estimates,commonVolatilities:[1]}));
   const input={sessions:1,tickers:['A'],weights:[1]};
   const r=summarizeQuality(points,input);assert.equal(r.summaries[0].calibration,2);assert.equal(r.summaries[0].coverage,0);
   assert.equal(summarizeQuality(points.slice(1),input).summaries[0].calibration,null);
   const twentyOne=evaluateCovarianceForecasts({...fixture(548),sessions:21});assert.equal(twentyOne.points.length,2);
+});
+
+test('Shared-volatility comparison is invariant to model marginal volatilities at every horizon',()=>{
+  const a=[[.04,.03],[.03,.09]],b=[[.16,.018],[.018,.0081]],common=[.3,.4],r=[.02,-.01],w=[.7,.3];
+  const saved=structuredClone([a,b,common]);
+  const x=withCommonVolatility(a,common),y=withCommonVolatility(b,common);
+  close(x[0][0],.09);close(x[1][1],.16);close(x[0][1],.06);
+  for(const h of [1,5,21]){
+    const sx=scoreForecast(x,r,w,h),sy=scoreForecast(y,r,w,h);
+    for(const key of Object.keys(sx))close(sx[key],sy[key]);
+    assert.ok(Math.abs(scoreForecast(a,r,w,h).loss-scoreForecast(b,r,w,h).loss)>1e-3);
+  }
+  assert.deepEqual([a,b,common],saved);
+});
+
+test('Paired shared-volatility loss matches the independent correlation likelihood formula',()=>{
+  const rho=.65,base=-.2,h=5,annualVol=[.2,.4],observed=[.01,-.03];
+  const cov=r=>[[.09,r*.3*.5],[r*.3*.5,.25]];
+  const z=observed.map((r,i)=>r/(annualVol[i]*Math.sqrt(h/252)));
+  const direct=r=>(Math.log(1-r*r)+(z[0]**2-2*r*z[0]*z[1]+z[1]**2)/(1-r*r))/4;
+  const loss=r=>scoreForecast(withCommonVolatility(cov(r),annualVol),observed,[1,-.5],h).loss;
+  close(loss(rho)-loss(base),direct(rho)-direct(base));
+  assert.ok(loss(rho)>loss(base),'Opposite-signed outcome should penalize high positive correlation in this example');
+});
+
+test('Correlation summaries and quarters aggregate their own paired scores, preserving the LW baseline',()=>{
+  const input=fixture(625),r=evaluateCovarianceForecasts(input);
+  assert.deepEqual(r.correlationSummaries.map(s=>s.count),r.summaries.map(s=>s.count));
+  for(const m of qualityModels){
+    const mean=r.points.reduce((s,p)=>s+p.correlationEstimates[m.id].loss-p.correlationEstimates.lw.loss,0)/r.points.length;
+    close(r.correlationSummaries.find(s=>s.id===m.id).lossVsLw,mean);
+    close(r.quarters.reduce((s,q)=>s+q.count*q.correlationDifferences[m.id],0)/r.points.length,mean);
+  }
+  assert.ok(r.correlationSummaries.every(s=>Number.isFinite(s.calibration)));
+  assert.ok(r.correlationSummaries.some((s,i)=>Math.abs(s.lossVsLw-r.summaries[i].lossVsLw)>1e-5));
+});
+
+test('Invalid correlation inputs fail rather than introducing implicit repairs or scales',()=>{
+  for(const matrix of [[[0,0],[0,1]],[[1]],[[1,NaN],[NaN,1]]])assert.throws(()=>withCommonVolatility(matrix,[.1,.2]),/positive finite/);
+  for(const vols of [[0,.2],[-1,.2],[Infinity,.2]])assert.throws(()=>withCommonVolatility([[1,0],[0,1]],vols),/positive finite/);
+  assert.throws(()=>scoreForecast(withCommonVolatility([[1,2],[2,1]],[.1,.2]),[.01,.02],[.5,.5],1),/positive definite/);
 });

@@ -893,3 +893,10 @@
 .quality-chart:focus-visible{outline:1px solid #50d9c5;outline-offset:-3px}
 @media(max-width:1100px){.covariance-workspace .covariance-expert-list{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:760px){.forecast-page-toolbar{gap:10px}.forecast-page-toolbar a{margin-left:0}.forecast-page-toolbar label{margin-left:auto}.covariance-workspace .covariance-expert-list{grid-template-columns:1fr 1fr}.quality-chart{padding:0 2px 10px}.quality-chart-legend{gap:8px 14px}.forecast-page-toolbar .segmented{flex-wrap:wrap}}
+
+/* Shared-volatility correlation comparison */
+.quality-comparison-controls{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 20px;border-bottom:1px solid var(--line)}
+.quality-comparison-controls>span{font-size:.8rem;color:var(--muted)}
+.quality-comparison-controls .segmented{display:flex;gap:4px;flex-wrap:wrap}
+.quality-comparison-controls button.on{border-color:#287c80;background:#15363a;color:var(--text)}
+.quality-comparison-controls button:disabled{opacity:.5;cursor:not-allowed}

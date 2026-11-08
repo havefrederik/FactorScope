@@ -608,8 +608,7 @@ export function buildCovarianceForecast(payload: MarketPayload, holdings: Analyt
   };
 }
 
-function createCombinedIewmaPredictor(assetReturns: number[][]) {
-  const experts = buildIewmaExpertSnapshots(assetReturns);
+export function createCombinedIewmaPredictor(assetReturns: number[][], experts = buildIewmaExpertSnapshots(assetReturns)) {
   const precisionCache = new Map<string, number[][]>();
   return (lastObservedPeriod: number) => {
     const forecast = forecastFromIewmaExperts(assetReturns, experts, lastObservedPeriod, precisionCache);

@@ -821,6 +821,24 @@
 @media(max-width:600px){.compare-period-row,.compare-allocation-row,.compare-options-row{padding:9px 10px}.compare-context{flex:1 1 100%}.compare-controls .compare-replay-controls{justify-content:flex-start;flex-wrap:wrap;flex-basis:100%}.compare-controls .compare-replay-controls label{flex:1}.compare-controls .compare-replay-controls input{flex:1;width:100px}.compare-controls .compare-toolbar label{width:100%;justify-content:space-between}.compare-controls .compare-toolbar select{flex:1;max-width:210px}.compare-controls .compare-toolbar button{font-size:10px}.compare-controls .compare-saved{margin-left:0}.compare-controls .compare-position-permissions{flex-basis:100%}}
 .factor-checkbox-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:7px 14px}
 .optimizer-factor-selection .factor-checkbox-grid label{font-size:11px;margin:0;display:flex;gap:6px;align-items:center}
+/* Give factor choices the panel width instead of a shrink-to-fit flex column. */
+.optimizer-risk-model>.panel-title{padding:12px 14px}
+.optimizer-risk-controls{padding:12px 14px 8px;gap:10px 14px;align-items:end}
+.optimizer-risk-controls label{min-width:0}
+.optimizer-risk-controls select{max-width:100%}
+.optimizer-risk-summary{display:flex;align-items:center;flex-wrap:wrap;gap:6px 22px;padding:0 14px 8px;font-size:12px}
+.optimizer-risk-summary .shrinkage-readout{align-self:auto;padding:0;font-size:10px}
+.optimizer-risk-model>.optimizer-factor-note{padding-bottom:10px;font-size:10px}
+.optimizer-model-factors{display:block;padding:10px 14px;border-top:1px solid var(--line)}
+.optimizer-model-factors h4{font-size:11px;margin:0 0 6px}
+.optimizer-model-factors .factor-checkbox-grid{width:100%;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:3px 12px}
+.optimizer-model-factors .factor-checkbox-grid label{min-width:0;min-height:28px;cursor:pointer}
+.optimizer-model-factors input[type=checkbox]{margin:0;flex-shrink:0;accent-color:var(--cyan)}
+.optimizer-model-factors .residual-checkbox-grid{grid-template-columns:repeat(10,minmax(0,1fr))}
+.optimizer-risk-model>details{border-top:1px solid var(--line);padding:10px 14px;font-size:11px}
+.optimizer-risk-model>details>summary{cursor:pointer;color:var(--muted)}
+@media(max-width:760px){.optimizer-risk-controls>label{flex:1 1 210px}.optimizer-risk-controls select{width:100%}.optimizer-model-factors .residual-checkbox-grid{grid-template-columns:repeat(5,minmax(0,1fr))}}
+@media(max-width:420px){.optimizer-model-factors .factor-checkbox-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:3px 8px}.optimizer-model-factors .residual-checkbox-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
 .optimizer-backtest fieldset{border:0;margin:0}.optimizer-backtest summary{font-weight:600}
 .strategy-decision-scroll{max-height:320px;overflow:auto}.strategy-decision-scroll table{width:100%;font-size:11px;text-align:left}
 .hindsight-controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));align-items:end}.hindsight-controls input,.hindsight-controls select{width:100%;max-width:none!important;min-height:32px}.hindsight-controls input[type=checkbox]{width:auto;min-height:0}.hindsight-table-scroll{overflow-x:auto}.hindsight-table-scroll small{display:block;max-width:220px;color:var(--muted);margin-top:5px}.hindsight-table-scroll td,.hindsight-table-scroll th{white-space:nowrap}.hindsight-settings{font-size:11px;max-height:280px;overflow:auto;padding:14px}.optimizer-backtest{scroll-margin-top:80px}.optimizer-backtest>details{padding:12px 14px}.hindsight-table-scroll button,.optimizer-backtest .panel-title button{padding:6px 9px;border:1px solid var(--line2);border-radius:4px;background:var(--bg);color:var(--text);font-size:11px}

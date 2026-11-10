@@ -8,7 +8,7 @@ import PortfolioHoldings from "./portfolio-holdings";
 
 const money=(n:number)=>new Intl.NumberFormat("en-US",{style:"currency",currency:"USD",maximumFractionDigits:0}).format(n);
 const pct=(n:number)=>`${(100*n).toFixed(2)}%`;
-export default function ExamplePortfolio({payload,example,sectors,firstMonth,setFirstMonth,cost,setCost,selectedDate,setSelectedDate,onSelectTicker,renderDecomposition,portfolioName="US Equity Portfolio",isAI=false}:{portfolioName?:string;isAI?:boolean;payload:MarketPayload;example:ExamplePortfolioResult;sectors:Record<string,string>;firstMonth:string;setFirstMonth:(value:string)=>void;cost:number;setCost:(value:number)=>void;selectedDate:string;setSelectedDate:(value:string)=>void;onSelectTicker:(ticker:string)=>void;renderDecomposition:(decomposition:SecurityDecomposition)=>ReactNode}){
+export default function ExamplePortfolio({riskSummary,payload,example,sectors,firstMonth,setFirstMonth,cost,setCost,selectedDate,setSelectedDate,onSelectTicker,renderDecomposition,portfolioName="US Equity Portfolio",isAI=false}:{riskSummary?:ReactNode;portfolioName?:string;isAI?:boolean;payload:MarketPayload;example:ExamplePortfolioResult;sectors:Record<string,string>;firstMonth:string;setFirstMonth:(value:string)=>void;cost:number;setCost:(value:number)=>void;selectedDate:string;setSelectedDate:(value:string)=>void;onSelectTicker:(ticker:string)=>void;renderDecomposition:(decomposition:SecurityDecomposition)=>ReactNode}){
   const end=payload.asOf??"";
   const decomposition=useMemo(()=>example?buildPortfolioDecomposition(payload,example.analytics):null,[payload,example]);
   const [chartView,setChartView]=useState<"Attribution"|"Returns by group">("Attribution");
@@ -40,10 +40,11 @@ export default function ExamplePortfolio({payload,example,sectors,firstMonth,set
           <div className="archive-metrics example-metrics">
             <article title={isAI?"Cumulative portfolio return; costs excluded":"Cumulative portfolio return after estimated execution costs"}><span>Total return</span><strong>{pct(example.analytics.totalReturn)}</strong></article>
             <article title="Compound annual growth rate over the displayed period"><span>Annualized return</span><strong>{example.annualReturn===null?"—":pct(example.annualReturn)}</strong></article>
-            <article title="Historical Sharpe over published French RF; see About for methodology"><span>Sharpe ratio</span><strong>{example.sharpe?.toFixed(2)??"—"}</strong></article>
-            <article title="Historical market beta against the S&P 500"><span>Market beta</span><strong>{example.analytics.beta.toFixed(2)}</strong></article>
+            <article title="Historical Sharpe over published French RF; see About for methodology"><span>Historical Sharpe</span><strong>{example.sharpe?.toFixed(2)??"—"}</strong></article>
+            <article title="Historical market beta against the S&P 500"><span>Historical market beta</span><strong>{example.analytics.beta.toFixed(2)}</strong></article>
           </div>
         </section>
+        {riskSummary}
         <PortfolioHoldings positions={positions} total={day.nav} history={{dates:example.days.map(day=>day.date),selectedDate:day.date,onSelectDate:setSelectedDate}} allocation={allocation} grouping={grouping} onGroupingChange={mode=>{setGrouping(mode);setSelectedGroup(null);setChartView("Returns by group");}} groupingOptions={(["Stocks","Sectors",...(example.days.some(d=>d.values.some(v=>v<0))?["Long / short"]:[])] as PortfolioGrouping[])} selectedGroup={selectedGroup} onSelectGroup={selectGroup} groupColors={Object.fromEntries(grouped.groups.map((group,i)=>[group.name,groupStyle(group.name).color]))} onSelectTicker={onSelectTicker} footer={isAI?undefined:<details className="example-cost-settings"><summary>Transaction costs <span>{cost} bps</span></summary><div><label>Execution cost (bps)<input aria-label="Example execution cost" type="number" min="0" max="100" value={cost} onChange={e=>setCost(Math.min(100,Math.max(0,Number(e.target.value))))}/></label><p>Estimated total: <strong>{money(example.totalCosts)}</strong>. Portfolio performance is shown after these costs; sector return paths are gross.</p></div></details>}/>
       </aside>
     </div>

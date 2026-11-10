@@ -119,6 +119,9 @@ export type StrategyBacktestAnalytics = {
   };
 };
 export type CovarianceForecastAnalytics = CovarianceSnapshot & {
+  riskBreakdown?: { common: number[][]; residual: number[][] };
+  marketBetas?: number[];
+  marketBetaLabel?: string;
   modelLabel?: string;
   shrinkage?: number;
   asOf: string;

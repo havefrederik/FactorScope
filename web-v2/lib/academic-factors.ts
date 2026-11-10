@@ -48,7 +48,15 @@ export function academicRisk(payload:MarketPayload,base:CovarianceForecastAnalyt
  const responsive=forecastOptions.weighting==='Responsive'?tradingFactorCovariance(betas,namedSelection.map(k=>factorRows.map(r=>r.values[k])),fit.panels.statistical,fit.panels.specific,fit.residualCovariance,forecastOptions.sessions):null;
  const matrix=(responsive?.covariance??fit.covariance).map(r=>r.map(v=>252*v));
  const specificVolatility=responsive?.specificVolatility??fit.specificVolatility;
- return {forecast:{...base,...summarizeCovariance(matrix,base.tickers,weights),observations:252,forecastSessions:forecastOptions.sessions,horizon:horizonLabel(forecastOptions.sessions),forecastMethod:forecastOptions.weighting==='Responsive'?'Responsive factor risk':'Constant covariance scaling',factorRiskObservations:factorRows.length,expertWeights:[],modelLabel:`Fama–French (${namedSelection.length}) + statistical factors (${selected.length}) · ${forecastOptions.weighting==='Responsive'?'responsive risk':'residual shrinkage'}`,shrinkage:fit.shrinkage},components:fit.components,specificVolatility,
+ const annual=(m:number[][])=>m.map(r=>r.map(v=>252*v));
+ const riskBreakdown={common:annual(responsive?.common??fit.commonCovariance),residual:annual(responsive?.residual??fit.residualCovariance)};
+ // Model-implied market covariance includes correlations with other named factors.
+ // It is not the conditional loading from the multivariate regression.
+ const centered=f.map(r=>{const mean=r.reduce((s,v)=>s+v,0)/r.length;return r.map(v=>v-mean)});
+ const fc=responsive?.factorCovariance??centered.map(a=>centered.map(b=>a.reduce((s,v,t)=>s+v*b[t],0)/a.length));
+ const market=namedSelection.indexOf(0);
+ const marketBetas=market>=0&&fc[market][market]>1e-20?betas.map(b=>b.reduce((s,v,k)=>s+v*fc[k][market],0)/fc[market][market]):undefined;
+ return {forecast:{...base,...summarizeCovariance(matrix,base.tickers,weights),riskBreakdown,marketBetas,marketBetaLabel:marketBetas?'French market excess return':undefined,observations:252,forecastSessions:forecastOptions.sessions,horizon:horizonLabel(forecastOptions.sessions),forecastMethod:forecastOptions.weighting==='Responsive'?'Responsive factor risk':'Constant covariance scaling',factorRiskObservations:factorRows.length,expertWeights:[],modelLabel:`Fama–French (${namedSelection.length}) + statistical factors (${selected.length}) · ${forecastOptions.weighting==='Responsive'?'responsive risk':'residual shrinkage'}`,shrinkage:fit.shrinkage},components:fit.components,specificVolatility,
   factors:namedSelection.map((id,k)=>({name:`French: ${data.names[id]}`,group:id===0?'Core':'Style',unit:'time-series beta',asOf:base.asOf,values:betas.map(b=>b[k])}))};
 }
 

@@ -54,5 +54,7 @@ export function tradingFactorCovariance(betas: number[][], factorHistory: number
   const pc = responsiveCovariance(statistical, sessions, 1);
   const specificVariances = specific.map(row => weightedHac([row.slice(-500)], 20, 1, sessions)[0][0]);
   const scale = specificVariances.map((v, i) => residualLw[i][i] > 1e-25 ? Math.sqrt(Math.max(0, v) / residualLw[i][i]) : 0);
-  return { covariance: named.map((row, i) => row.map((v, j) => v + pc[i][j] + residualLw[i][j] * scale[i] * scale[j])), specificVolatility: specificVariances.map(v => Math.sqrt(Math.max(0, v) * 252)) };
+  const common = named.map((row,i)=>row.map((v,j)=>v+pc[i][j]));
+  const residual = residualLw.map((row,i)=>row.map((v,j)=>v*scale[i]*scale[j]));
+  return { covariance: common.map((row,i)=>row.map((v,j)=>v+residual[i][j])), common, residual, factorCovariance: factors, specificVolatility: specificVariances.map(v => Math.sqrt(Math.max(0, v) * 252)) };
 }

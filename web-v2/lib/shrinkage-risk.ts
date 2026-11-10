@@ -60,7 +60,7 @@ export function hybridRisk(returns:number[][], observedFactors:number[][], selec
   const remaining=x.map((r,i)=>r.map((v,t)=>v-common[i][t]));
   const lw=ledoitWolf(remaining,shrinkageOverride),commonCov=covariance(common);
   return {covariance:commonCov.map((r,i)=>r.map((v,j)=>v+lw.covariance[i][j])),shrinkage:lw.shrinkage,specificVolatility:remaining.map(r=>Math.sqrt(252*dot(r,r)/n)),rank:basis.length,
-    panels:{statistical:common.map((r,i)=>r.map((v,t)=>v-fitted[i][t])),specific:remaining},residualCovariance:lw.covariance,
+    panels:{statistical:common.map((r,i)=>r.map((v,t)=>v-fitted[i][t])),specific:remaining},commonCovariance:commonCov,residualCovariance:lw.covariance,
     components:components.map((c,k)=>({name:`F${k+1}`,group:'Residual statistical',values:c.vector.map(v=>100*v*Math.sqrt(c.variance)),unit:'pp per daily 1σ factor move',variance:c.variance}))};
 }
 
@@ -75,5 +75,6 @@ export function alternativeRisk(payload:MarketPayload,base:CovarianceForecastAna
   const assets=base.tickers.map(t=>series.get(t)!);
   const estimate=mode==='Ledoit–Wolf'?{...ledoitWolf(assets,shrinkageOverride),components:[] as ReturnType<typeof hybridRisk>['components']}:hybridRisk(assets,factorDefs.filter((_,i)=>namedSelection===undefined||namedSelection.includes(i)).map(f=>series.get(f.long)!.map((v,i)=>v-(f.short?series.get(f.short)![i]:0))),selected,shrinkageOverride);
   const matrix=estimate.covariance.map(r=>r.map(v=>252*v));
-  return {forecast:{...base,...summarizeCovariance(matrix,base.tickers,weights),observations:252,expertWeights:[],modelLabel:mode==='Ledoit–Wolf'?(shrinkageOverride===null?'Ledoit–Wolf · automatic shrinkage':'Manual shrinkage · scaled identity'):`ETF proxies + ${selected.length} residual PCs · residual Ledoit–Wolf`,shrinkage:estimate.shrinkage},components:estimate.components};
+  const riskBreakdown='commonCovariance' in estimate?{common:estimate.commonCovariance.map(r=>r.map(v=>252*v)),residual:estimate.residualCovariance.map(r=>r.map(v=>252*v))}:undefined;
+  return {forecast:{...base,...summarizeCovariance(matrix,base.tickers,weights),riskBreakdown,marketBetas:undefined,marketBetaLabel:undefined,observations:252,expertWeights:[],modelLabel:mode==='Ledoit–Wolf'?(shrinkageOverride===null?'Ledoit–Wolf · automatic shrinkage':'Manual shrinkage · scaled identity'):`ETF proxies + ${selected.length} residual PCs · residual Ledoit–Wolf`,shrinkage:estimate.shrinkage},components:estimate.components};
 }

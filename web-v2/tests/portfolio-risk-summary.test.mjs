@@ -7,6 +7,16 @@ import {optimizePortfolio} from '../lib/portfolio-optimizer.ts';
 const close=(a,b,t=1e-10)=>assert.ok(Math.abs(a-b)<t,`${a} != ${b}`);
 const model={asOf:'2026-09-30',tickers:['A','B'],forecastSessions:5,covarianceMatrix:[[.05,.02],[.02,.03]],riskBreakdown:{common:[[.04,.02],[.02,.01]],residual:[[.01,0],[0,.02]]},marketBetas:[1.2,.8]};
 
+test('capital and gross coincide at full investment and rescale with cash or leverage',()=>{
+ for(const scale of [.8,1,1.5]){
+  const weights={A:.6*scale,B:.4*scale},capital=1e6;
+  const a=portfolioRiskSummary(model,weights,capital),b=portfolioRiskSummary(model,weights,capital,'gross');
+  close(a.grossDollars,capital*scale,1e-6);
+  for(const key of ['volatility','annualVolatility','beta','longBeta','shortBeta','gross','net','long','short'])close(b[key],a[key]/scale);
+  for(const key of ['dollarRisk','dollarBeta','commonShare','residualShare','topFiveWeight','topFiveRisk','effectivePositions'])close(b[key],a[key]);
+ }
+});
+
 test('long/short forecast shares, beta contributions and capital/gross units reconcile',()=>{
  const weights={A:1,B:-1},capital=1e6,a=portfolioRiskSummary(model,weights,capital),b=portfolioRiskSummary(model,weights,capital,'gross');
  close(a.net,0);close(a.gross,2);close(a.beta,.4);close(a.longBeta,1.2);close(a.shortBeta,-.8);close(a.longBeta+a.shortBeta,a.beta);

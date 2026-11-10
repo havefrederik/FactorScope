@@ -1,5 +1,5 @@
 export type ExposureLimit={name:string;values:number[];min:number|null;max:number|null};
-export type OptimizerInput={riskHorizonSessions?:number;riskReturnBasis?:'excess'|'total';covariance:number[][];current:number[];objective:"Minimum volatility"|"Maximum Sharpe"|"Minimum tracking error";expectedReturns?:number[];referenceWeights?:number[];longOnly:boolean;shortOnly?:boolean;net:number;netMin?:number;netMax?:number;gross:number;positionCap:number;positionBounds?:{min:number|null;max:number|null}[];newNameGrossCap?:number;turnoverCap:number|null;changeCap:number|null;locked:number[];exposures:ExposureLimit[]};
+export type OptimizerInput={returnInputKind?:"preferences"|"forecasts";riskHorizonSessions?:number;riskReturnBasis?:'excess'|'total';covariance:number[][];current:number[];objective:"Minimum volatility"|"Maximum Sharpe"|"Minimum tracking error";expectedReturns?:number[];referenceWeights?:number[];longOnly:boolean;shortOnly?:boolean;net:number;netMin?:number;netMax?:number;gross:number;positionCap:number;positionBounds?:{min:number|null;max:number|null}[];newNameGrossCap?:number;turnoverCap:number|null;changeCap:number|null;locked:number[];exposures:ExposureLimit[]};
 export type OptimizerAudit={name:string;current:number;proposed:number;min:number|null;max:number|null;passed:boolean};
 export type OptimizerResult={status:"Solved"|"Invalid inputs"|"Infeasible"|"Not solved";message:string;weights:number[];volatility:number;currentVolatility:number;cash:number;gross:number;turnover:number;expectedReturn:number|null;assumedSharpe:number|null;audit:OptimizerAudit[];iterations:number;primalResidual:number;dualResidual:number;minimumTurnover?:number;turnoverLimit?:number};
 const dot=(a:number[],b:number[])=>a.reduce((s,v,i)=>s+v*b[i],0);
@@ -47,10 +47,12 @@ export function optimizePortfolio(input:OptimizerInput):OptimizerResult{
   if(input.newNameGrossCap!==undefined&&(!Number.isFinite(input.newNameGrossCap)||input.newNameGrossCap<0))return empty("Invalid inputs","Check the combined allocation limit for new names.");
   if(input.locked.some(i=>!Number.isInteger(i)||i<0||i>=n))return empty("Invalid inputs","A locked position is outside the optimization universe.");
   for(const exposure of input.exposures)if(exposure.values.length!==n||exposure.values.some(v=>!Number.isFinite(v))||exposure.min!==null&&!Number.isFinite(exposure.min)||exposure.max!==null&&!Number.isFinite(exposure.max)||exposure.min!==null&&exposure.max!==null&&exposure.min>exposure.max)return empty("Invalid inputs",`Check ${exposure.name} exposure bounds.`);
+  const scoreName=input.returnInputKind==="preferences"?"preference score":"expected excess return";
+  const objectiveName=input.returnInputKind==="preferences"?"Maximum preference / risk":"Maximum expected Sharpe";
   const sharpe=input.objective==="Maximum Sharpe",mu=input.expectedReturns??Array(n).fill(0);
-  if(sharpe&&(mu.length!==n||mu.some(v=>!Number.isFinite(v))||!mu.some(v=>Math.abs(v)>1e-10)))return empty("Invalid inputs","Enter annual expected excess returns for maximum-Sharpe optimization. Blank values mean zero.");
-  if(sharpe&&input.longOnly&&mu.every(v=>v<=0))return empty("Invalid inputs","Maximum Sharpe requires a feasible portfolio with positive assumed excess return.");
-  if(sharpe&&input.longOnly&&netMax===0)return empty("Invalid inputs","A long-only portfolio with zero net exposure cannot have positive assumed excess return.");
+  if(sharpe&&(mu.length!==n||mu.some(v=>!Number.isFinite(v))||!mu.some(v=>Math.abs(v)>1e-10)))return empty("Invalid inputs",input.returnInputKind==="preferences"?"Choose a preference rule with finite, non-zero scores.":"Enter annual expected excess returns for maximum expected Sharpe. Blank values mean zero.");
+  if(sharpe&&input.longOnly&&mu.every(v=>v<=0))return empty("Invalid inputs",`${objectiveName} requires a feasible portfolio with positive ${scoreName}.`);
+  if(sharpe&&input.longOnly&&netMax===0)return empty("Invalid inputs",`A long-only portfolio with zero net exposure cannot have positive ${scoreName}.`);
   const tracking=input.objective==="Minimum tracking error",reference=input.referenceWeights??input.current;
   if(tracking&&(reference.length!==n||reference.some(v=>!Number.isFinite(v))))return empty("Invalid inputs","Aligned finite reference weights are required for tracking error.");
   const average=input.covariance.reduce((s,row,i)=>s+row[i],0)/n;
@@ -123,6 +125,6 @@ export function optimizePortfolio(input:OptimizerInput):OptimizerResult{
   for(const exposure of input.exposures)check(exposure.name,dot(exposure.values,input.current),dot(exposure.values,weights),exposure.min,exposure.max);
   if(audit.some(item=>!item.passed))return empty("Not solved","The numerical solution did not pass the constraint audit. No proposal has been applied.");
   const risk=volatility(weights,covariance),expectedReturn=sharpe?dot(mu,weights):null;
-  if(sharpe&&!(expectedReturn!>1e-8))return empty("Not solved","No positive assumed excess-return portfolio was found under these limits.");
+  if(sharpe&&!(expectedReturn!>1e-8))return empty("Not solved",`No portfolio with positive ${scoreName} was found under these limits.`);
   return {status:"Solved",message:"Converged; every enabled constraint passed the independent weight audit.",weights,volatility:risk,currentVolatility:volatility(input.current,covariance),cash:1-sum(weights),gross,turnover,expectedReturn,assumedSharpe:expectedReturn!==null&&risk>1e-12?expectedReturn/risk:null,audit,iterations:solved.iteration,primalResidual:solved.primalResidual,dualResidual:solved.dualResidual};
 }

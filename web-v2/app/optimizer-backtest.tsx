@@ -1,4 +1,5 @@
 "use client";
+import {objectiveChoice} from "@/lib/optimizer-controls";
 import {horizonLabel} from '@/lib/forecast-horizon';
 import {useEffect,useMemo,useState} from 'react';
 import {backtestOptimizer,riskReductionValue,type ReoptimizationPolicy} from '@/lib/optimizer-backtest';
@@ -30,7 +31,7 @@ export default function OptimizerBacktest({payload,tickers,initial,history,refer
    const r=await backtestOptimizer(payload,tickers,start,end,starting,policy,buildModel,setProgress);
    const candidate=reference?historyWindow(reference,r.dates[0],r.dates.at(-1)!):null;
    const baseline=candidate&&JSON.stringify(candidate.dates)===JSON.stringify(r.dates)?candidate:null;
-   const settings=JSON.parse(modelSignature);const label=`${settings.riskEstimator} · ${horizonLabel(settings.forecastOptions?.sessions??1)} · ${settings.riskEstimator==='Fama–French 5 + momentum'?(settings.forecastOptions?.weighting??'Equal-weight'):'Constant-covariance scaling'} · ${settings.shrinkageMode??'Automatic'}${settings.shrinkageMode==='Manual'?` ${settings.manualShrinkage}%`:''}`;
+   const settings=JSON.parse(modelSignature);const label=`${objectiveChoice(settings.objective,settings.returnAssumption)} · ${settings.riskEstimator} · ${horizonLabel(settings.forecastOptions?.sessions??1)} · ${settings.riskEstimator==='Fama–French 5 + momentum'?(settings.forecastOptions?.weighting??'Equal-weight'):'Constant-covariance scaling'} · ${settings.shrinkageMode??'Automatic'}${settings.shrinkageMode==='Manual'?` ${settings.manualShrinkage}%`:''}`;
    const snapshot:HindsightRun={riskCalibration:{bias:r.calibration.bias,windows:r.calibration.windows.length},version:1,sharpeBenchmark:payload.academicFactors?'French RF':'BIL',id:crypto.randomUUID(),name:name.trim()||`Run ${runs.length+1}`,createdAt:new Date().toISOString(),comparisonKey:JSON.stringify([tickers,r.dates,starting,dataFingerprint]),modelSignature,modelLabel:label,policy:{...policy},infeasibleDecisions:r.events.filter(e=>e.status==='Skipped: infeasible limits').length,start:r.dates[0],end:r.dates.at(-1)!,sharpe:historicalSharpe(r.dates,r.dailyReturns,payload),baselineSharpe:baseline?historicalSharpe(baseline.dates,baseline.dailyReturns,payload):null,...pathMetrics(r.curve,r.dailyReturns),trades:r.events.filter(e=>e.status==='Traded').length,turnover:r.events.filter(e=>e.status==='Traded').reduce((s,e)=>s+e.turnover,0),cost:r.totalCosts,dates:r.dates,curve:r.curve};
    save([...runs,snapshot].slice(-12));setActiveId(snapshot.id);setResult(r);setSignature(config);setAudit({settings,policy:{...policy},start,end,tickers,starting,...r});
  }catch(e){setError((e as Error).message);}finally{setBusy(false);}}
@@ -41,7 +42,7 @@ export default function OptimizerBacktest({payload,tickers,initial,history,refer
  const exampleBenefit=riskReductionValue(.3**2,.28**2,policy.riskAversion,policy.horizon);
  function load(r:HindsightRun){setStart(r.start);setEnd(r.end);setPolicy({...defaults,...r.policy});setName(r.name+' variant');onLoadSettings(r.name,r.modelSignature);}
  return <details id="hindsight-lab" className="panel optimizer-config optimizer-backtest"><summary>Hindsight Lab · compare models & rebalance rules</summary>
- <p className="optimizer-factor-note">Run the selected setup through history, change its settings, then run again to compare. Risk forecast: {horizonLabel(JSON.parse(modelSignature).forecastOptions?.sessions??1).toLowerCase()}. Each decision uses preceding observations. Published factor histories can contain later revisions; see About.</p>
+ <p className="optimizer-factor-note">Run the selected setup through history, change its settings, then run again to compare. Objective: {objectiveChoice(JSON.parse(modelSignature).objective,JSON.parse(modelSignature).returnAssumption)}. Risk forecast: {horizonLabel(JSON.parse(modelSignature).forecastOptions?.sessions??1).toLowerCase()}. Each decision uses preceding observations. Published factor histories can contain later revisions; see About.</p>
  {unavailable?<p className="optimizer-error">{unavailable}</p>:<><fieldset disabled={busy} className="optimizer-config-controls hindsight-controls">
  <label>Run name<input aria-label="Hindsight run name" value={name} placeholder={`Run ${runs.length+1}`} onChange={e=>setName(e.target.value)}/></label>
  <label>From<input aria-label="Hindsight start date" type="date" min={earliest} max={end} value={start} onChange={e=>setStart(e.target.value)}/></label>

@@ -35,7 +35,8 @@ export default function ExamplePortfolio({riskSummary,payload,example,sectors,fi
           </div>
         </section>
       </div>
-      <aside className="portfolio-side-stack" aria-label="Portfolio summary and holdings">
+      <PortfolioHoldings positions={positions} total={day.nav} history={{dates:example.days.map(day=>day.date),selectedDate:day.date,onSelectDate:setSelectedDate}} allocation={allocation} grouping={grouping} onGroupingChange={mode=>{setGrouping(mode);setSelectedGroup(null);setChartView("Returns by group");}} groupingOptions={(["Stocks","Sectors",...(example.days.some(d=>d.values.some(v=>v<0))?["Long / short"]:[])] as PortfolioGrouping[])} selectedGroup={selectedGroup} onSelectGroup={selectGroup} groupColors={Object.fromEntries(grouped.groups.map((group,i)=>[group.name,groupStyle(group.name).color]))} onSelectTicker={onSelectTicker} footer={isAI?undefined:<details className="example-cost-settings"><summary>Transaction costs <span>{cost} bps</span></summary><div><label>Execution cost (bps)<input aria-label="Example execution cost" type="number" min="0" max="100" value={cost} onChange={e=>setCost(Math.min(100,Math.max(0,Number(e.target.value))))}/></label><p>Estimated total: <strong>{money(example.totalCosts)}</strong>. Portfolio performance is shown after these costs; sector return paths are gross.</p></div></details>}/>
+      <aside className="portfolio-side-stack" aria-label="Portfolio performance and risk summary">
         <section className="panel overview-summary" aria-label="Portfolio performance summary">
           <div className="archive-metrics example-metrics">
             <article title={isAI?"Cumulative portfolio return; costs excluded":"Cumulative portfolio return after estimated execution costs"}><span>Total return</span><strong>{pct(example.analytics.totalReturn)}</strong></article>
@@ -45,7 +46,6 @@ export default function ExamplePortfolio({riskSummary,payload,example,sectors,fi
           </div>
         </section>
         {riskSummary}
-        <PortfolioHoldings positions={positions} total={day.nav} history={{dates:example.days.map(day=>day.date),selectedDate:day.date,onSelectDate:setSelectedDate}} allocation={allocation} grouping={grouping} onGroupingChange={mode=>{setGrouping(mode);setSelectedGroup(null);setChartView("Returns by group");}} groupingOptions={(["Stocks","Sectors",...(example.days.some(d=>d.values.some(v=>v<0))?["Long / short"]:[])] as PortfolioGrouping[])} selectedGroup={selectedGroup} onSelectGroup={selectGroup} groupColors={Object.fromEntries(grouped.groups.map((group,i)=>[group.name,groupStyle(group.name).color]))} onSelectTicker={onSelectTicker} footer={isAI?undefined:<details className="example-cost-settings"><summary>Transaction costs <span>{cost} bps</span></summary><div><label>Execution cost (bps)<input aria-label="Example execution cost" type="number" min="0" max="100" value={cost} onChange={e=>setCost(Math.min(100,Math.max(0,Number(e.target.value))))}/></label><p>Estimated total: <strong>{money(example.totalCosts)}</strong>. Portfolio performance is shown after these costs; sector return paths are gross.</p></div></details>}/>
       </aside>
     </div>
   </div>;

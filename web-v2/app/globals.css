@@ -516,10 +516,11 @@
 @media(max-width:900px){.example-portfolio .example-metrics{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 0}.example-portfolio .example-metrics article:nth-child(3n+1){border-left:0;padding-left:0}.example-title-block{gap:5px 12px}}
 @media(max-width:760px){.example-summary-head{gap:10px;margin-bottom:8px}.example-title-block{display:grid;gap:3px}.example-summary-head h1{font-size:16px}.example-summary-actions{gap:5px}.example-export,.example-settings summary{font-size:9px;padding:5px 7px}.example-settings-body{right:-85px;width:270px}.example-portfolio .example-metrics article{padding:4px 10px;border-right:0;border-bottom:0;border-left:1px solid #292b27;gap:5px}.example-portfolio .example-metrics article:nth-child(-n+2){border-bottom:0}.example-portfolio .example-metrics article:nth-child(3n+1){padding-left:0;border-left:0}.example-portfolio .example-metrics article>span{font-size:9px}.example-portfolio .example-metrics article strong{font-size:18px}}
 
-/* Chart-led overview: a small summary and dated book live in the side column. */
-.portfolio-overview-grid{grid-template-areas:'chart side'}
+/* Chart-led overview: positions follow the chart; summary and risk stay alongside. */
+.portfolio-overview-grid{grid-template-areas:'chart side' 'holdings side'}
 .portfolio-chart-stack{grid-area:chart}.portfolio-side-stack{grid-area:side;display:grid;gap:12px;position:sticky;top:16px;min-width:0}
-.example-portfolio .portfolio-side-stack .example-holdings{position:static}
+.example-portfolio .portfolio-overview-grid>.portfolio-holdings-panel{grid-area:holdings;position:static}
+@media(min-width:1001px){.example-portfolio .portfolio-overview-grid>.portfolio-holdings-panel .archive-date-heading{flex-direction:row;align-items:center}.example-portfolio .portfolio-overview-grid>.portfolio-holdings-panel .archive-date-heading label{width:auto;gap:12px}.example-portfolio .portfolio-overview-grid>.portfolio-holdings-panel .archive-table-scroll{max-height:390px}}
 .overview-summary{padding:5px 10px}
 .example-portfolio .overview-summary .example-metrics{grid-template-columns:repeat(2,minmax(0,1fr));padding:0;margin:0;border:0;background:transparent;gap:0}
 .example-portfolio .overview-summary .example-metrics article{padding:8px 6px;border:0;gap:5px;grid-template-columns:1fr}

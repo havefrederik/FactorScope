@@ -939,3 +939,6 @@
 .optimizer-short-status strong{font-weight:600}.optimizer-short-status.warning,.optimizer-short-status.error{border-color:#9b7356;background:#a56a3014}.optimizer-short-status.warning strong,.optimizer-short-status.error strong{color:#e8be97}
 .optimizer-short-status button{justify-self:start;font-size:10px;padding:5px 8px}.optimizer-short-warning{display:flex;flex-wrap:wrap;align-items:center;gap:5px 12px;color:#e8be97;font-size:11px}.optimizer-short-warning span{color:var(--muted)}.optimizer-short-warning button{font-size:10px;padding:4px 8px}
 .optimizer-method-link{font-size:10px;color:var(--muted);text-underline-offset:3px}.optimizer-constraints{scroll-margin-top:140px}
+
+.optimizer-exposure-preset{display:grid;gap:7px;padding-bottom:12px;border-bottom:1px solid var(--line)}
+.optimizer-exposure-preset label{display:grid;gap:7px;font-size:10px;color:#c0c2b8}.optimizer-exposure-preset select{width:100%;min-width:0}

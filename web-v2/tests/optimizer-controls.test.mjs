@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { objectiveChoice, selectObjective, shortExposureStatus } from '../lib/optimizer-controls.ts';
+import { objectiveChoice, selectObjective, shortExposureStatus, exposurePresets, matchingExposurePreset, minimumNetTrade } from '../lib/optimizer-controls.ts';
 import { optimizePortfolio } from '../lib/portfolio-optimizer.ts';
 
 const base = { current: [.5, .5], longOnly: false, net: 1, gross: 1, positionCap: 2, turnoverCap: null, changeCap: null, locked: [] };
@@ -68,4 +68,60 @@ test('validation names the actual score type; neither mode silently supplies a f
   const supplied=solve({returnInputKind:'forecasts',expectedReturns:[.03,.1],gross:1.6});
   assert.equal(supplied.status,'Solved',supplied.message);
   close(supplied.assumedSharpe,supplied.expectedReturn/supplied.volatility);
+});
+
+
+test('exposure presets enforce the advertised budgets and retain other constraints', () => {
+  for (const preset of exposurePresets) {
+    const r=solve({...preset,expectedReturns:[1,2],turnoverCap:3,positionCap:.8});
+    assert.equal(r.status,'Solved',`${preset.id}: ${r.message}`);
+    close(r.weights.reduce((a,b)=>a+b),preset.net);
+    assert.ok(r.gross<=preset.gross+2e-5);
+    assert.ok(r.weights.every(w=>Math.abs(w)<=.8+2e-5));
+    assert.ok(r.audit.every(a=>a.passed));
+    if(preset.longOnly)assert.ok(r.weights.every(w=>w>=-2e-5));
+    if(preset.id==='neutral')assert.ok(r.weights.some(w=>w<-.01)&&r.weights.some(w=>w>.01));
+  }
+});
+test('preset matching follows actual limits, including saved/restored and custom settings', () => {
+  for(const p of exposurePresets) {
+    const saved=JSON.parse(JSON.stringify({...p,netRange:false}));
+    assert.equal(matchingExposurePreset(saved),p.id);
+    assert.equal(matchingExposurePreset({...saved,gross:p.gross+.01}),'custom');
+    assert.equal(matchingExposurePreset({...saved,net:p.net+.01}),'custom');
+    assert.equal(matchingExposurePreset({...saved,longOnly:!p.longOnly}),'custom');
+    assert.equal(matchingExposurePreset({...saved,netRange:true}),'custom');
+  }
+});
+test('net-transition budget gives a necessary lower bound and the solver rejects a smaller budget', () => {
+  close(minimumNetTrade([.5,.5],0,0),1);
+  close(minimumNetTrade([1.3,-.3],0,0),1);
+  close(minimumNetTrade([.5,.5],-.1,.1),.9);
+  close(minimumNetTrade([-.2,-.3],0,0),.5);
+  close(minimumNetTrade([.5,.5],.9,1.1),0);
+  assert.equal(minimumNetTrade([NaN],0,0),null);
+  assert.equal(minimumNetTrade([1],1,0),null);
+  const neutral=exposurePresets.find(p=>p.id==='neutral');
+  const blocked=solve({...neutral,expectedReturns:[1,2],turnoverCap:.3});
+  assert.equal(blocked.status,'Infeasible');
+  close(blocked.minimumTurnover,1);
+  assert.equal(blocked.weights.length,0);
+  const allowed=solve({...neutral,expectedReturns:[1,2],turnoverCap:1.2});
+  assert.equal(allowed.status,'Solved',allowed.message);
+  assert.ok(allowed.turnover<=1.2+2e-5);
+});
+test('zero-net minimum volatility legitimately chooses cash; the gross preset is only a ceiling', () => {
+  const r=solve({...exposurePresets.find(p=>p.id==='neutral'),objective:'Minimum volatility',turnoverCap:1});
+  assert.equal(r.status,'Solved',r.message);
+  close(r.gross,0); close(r.cash,1);
+});
+test('zero-net ratios with identical signed scores fail immediately with actionable guidance', () => {
+  for(const kind of ['preferences','forecasts']) {
+    const r=solve({...exposurePresets.find(p=>p.id==='neutral'),returnInputKind:kind,expectedReturns:[1,1]});
+    assert.equal(r.status,'Invalid inputs');
+    assert.equal(r.iterations,0);
+    assert.match(r.message,/cancel at 0% net/);
+  }
+  const signed=solve({...exposurePresets.find(p=>p.id==='neutral'),expectedReturns:[-1,1]});
+  assert.equal(signed.status,'Solved',signed.message);
 });

@@ -14,6 +14,23 @@ export function selectObjective(choice: ObjectiveChoice, assumption: ReturnAssum
   return { objective: choice, assumption };
 }
 
+export const exposurePresets = [
+  { id: 'long-only', label: 'Long-only', longOnly: true, shortOnly: false, net: 1, gross: 1, description: '100% net · maximum 100% gross · no short positions.' },
+  { id: '130-30', label: '130/30 limits', longOnly: false, shortOnly: false, net: 1, gross: 1.6, description: '100% net · maximum 160% gross · up to 130% long and 30% short. Shorts are permitted, not required.' },
+  { id: 'neutral', label: 'Market-neutral · dollar-neutral', longOnly: false, shortOnly: false, net: 0, gross: 2, description: '0% net · maximum 200% gross · up to 100% on each side. Equal long/short dollars; market beta is not constrained.' },
+] as const;
+export function matchingExposurePreset(input: Pick<OptimizerInput, 'longOnly' | 'shortOnly' | 'net' | 'gross'> & { netRange: boolean }): string {
+  if (input.netRange) return 'custom';
+  return exposurePresets.find(p => p.longOnly === input.longOnly && p.shortOnly === !!input.shortOnly && Math.abs(p.net - input.net) < 1e-8 && Math.abs(p.gross - input.gross) < 1e-8)?.id ?? 'custom';
+}
+// Triangle inequality: sum |new-current| >= |sum(new-current)|. This is
+// only a necessary trading budget, not a full constraint-feasibility check.
+export function minimumNetTrade(current: number[], netMin: number, netMax: number): number | null {
+  if (![...current, netMin, netMax].every(Number.isFinite) || netMin > netMax) return null;
+  const net = current.reduce((a, b) => a + b, 0);
+  return Math.max(0, netMin - net, net - netMax);
+}
+
 type ShortInputs = Pick<OptimizerInput, 'current' | 'longOnly' | 'shortOnly' | 'net' | 'netMin' | 'netMax' | 'gross' | 'positionCap' | 'positionBounds' | 'locked' | 'turnoverCap' | 'changeCap' | 'newNameGrossCap'>;
 type ShortStatus = { severity: 'info' | 'warning' | 'error'; blocked: boolean; title: string; detail: string; focus: 'sides' | 'exposure' | 'allocation'; exposureShortCeiling: number | null };
 const pct = (x: number) => `${Number((x * 100).toFixed(2))}%`;

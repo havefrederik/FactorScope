@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {weightedHac,responsiveCovariance,tradingFactorCovariance,horizonVolatility,validateForecastOptions} from '../lib/forecast-horizon.ts';
 import {academicRisk} from '../lib/academic-factors.ts';
 import {optimizePortfolio} from '../lib/portfolio-optimizer.ts';
+import {buildOptimizerReturns,returnAssumptions} from '../lib/optimizer-returns.ts';
 import {calibrateRisk} from '../lib/forecast-calibration.ts';
 const close=(a,b,t=1e-10)=>assert.ok(Math.abs(a-b)<t,`${a} != ${b}`);
 const dot=(a,b)=>a.reduce((s,v,i)=>s+v*b[i],0);
@@ -80,4 +81,21 @@ test('forecast validation uses only subsequent, complete, non-overlapping interv
  const z=Array.from({length:21},(_,i)=>(i%2?1:-1)*Math.sqrt(20/21));
  const c=calibrateRisk(z.map((_,index)=>({index,sessions:1,weights:[1],annualVariance:252,excess:false})),Array.from({length:22},(_,i)=>String(i)),[z],[]);
  assert.equal(c.windows.length,21);assert.ok(c.bias>.9&&c.bias<1.1);
+});
+
+test('volatility-based return assumptions refit with the dated model and exclude future information',()=>{
+ const {payload,data,base,weights}=fixture();
+ const estimate=(p,d,date)=>academicRisk(p,{...base,asOf:date},weights,d,undefined,[0],null,{sessions:5,weighting:'Responsive'});
+ const earlier=payload.series.S0.points[1000].date;
+ const before=estimate(payload,data,earlier),now=estimate(payload,data,base.asOf);
+ const future=structuredClone(payload),factors=structuredClone(data);
+ Object.values(future.series).forEach(s=>s.points.forEach(p=>{if(p.date>base.asOf)p.close*=100}));
+ factors.rows.forEach(r=>{if(r.date>base.asOf)r.values=r.values.map(v=>v+100)});
+ const changed=estimate(future,factors,base.asOf);
+ for(const mode of returnAssumptions.slice(0,2)){
+  const inputs=risk=>buildOptimizerReturns({tickers:base.tickers,current:weights,mode,side:'both',idiosyncraticVolatility:risk.specificVolatility,covariance:risk.forecast.covarianceMatrix});
+  assert.deepEqual(inputs(now),inputs(changed));
+  assert.ok(inputs(now).some((v,i)=>Math.abs(v-inputs(before)[i])>1e-6));
+  assert.ok(inputs(now)[3]<0);
+ }
 });

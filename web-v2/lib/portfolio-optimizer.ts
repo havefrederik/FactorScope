@@ -4,7 +4,7 @@ export type OptimizerAudit={name:string;current:number;proposed:number;min:numbe
 export type OptimizerResult={status:"Solved"|"Invalid inputs"|"Infeasible"|"Not solved";message:string;weights:number[];volatility:number;currentVolatility:number;cash:number;gross:number;turnover:number;expectedReturn:number|null;assumedSharpe:number|null;audit:OptimizerAudit[];iterations:number;primalResidual:number;dualResidual:number;minimumTurnover?:number;turnoverLimit?:number};
 export function zeroNetRatioMessage(scores:number[],netMin:number,netMax:number,kind:OptimizerInput['returnInputKind']):string{
   if(netMin!==0||netMax!==0||!scores.length||!scores.every(v=>Number.isFinite(v)&&v===scores[0]))return "";
-  return kind==="preferences"?"Equal signed preferences cancel at 0% net exposure. Choose a preference rule that distinguishes stocks, or supply different expected-return forecasts.":"Identical expected-return forecasts cancel at 0% net exposure. Supply forecasts that distinguish stocks, or choose another objective.";
+  return kind==="preferences"?"Identical signed return assumptions cancel at 0% net exposure. Choose a return assumption that distinguishes stocks, or supply different expected-return forecasts.":"Identical expected-return forecasts cancel at 0% net exposure. Supply forecasts that distinguish stocks, or choose another objective.";
 }
 const dot=(a:number[],b:number[])=>a.reduce((s,v,i)=>s+v*b[i],0);
 const multiply=(a:number[][],x:number[])=>a.map(row=>dot(row,x));
@@ -51,10 +51,10 @@ export function optimizePortfolio(input:OptimizerInput):OptimizerResult{
   if(input.newNameGrossCap!==undefined&&(!Number.isFinite(input.newNameGrossCap)||input.newNameGrossCap<0))return empty("Invalid inputs","Check the combined allocation limit for new names.");
   if(input.locked.some(i=>!Number.isInteger(i)||i<0||i>=n))return empty("Invalid inputs","A locked position is outside the optimization universe.");
   for(const exposure of input.exposures)if(exposure.values.length!==n||exposure.values.some(v=>!Number.isFinite(v))||exposure.min!==null&&!Number.isFinite(exposure.min)||exposure.max!==null&&!Number.isFinite(exposure.max)||exposure.min!==null&&exposure.max!==null&&exposure.min>exposure.max)return empty("Invalid inputs",`Check ${exposure.name} exposure bounds.`);
-  const scoreName=input.returnInputKind==="preferences"?"preference score":"expected excess return";
-  const objectiveName=input.returnInputKind==="preferences"?"Maximum preference / risk":"Maximum expected Sharpe";
+  const scoreName=input.returnInputKind==="preferences"?"assumed return score":"expected excess return";
+  const objectiveName=input.returnInputKind==="preferences"?"Maximum return / risk":"Maximum expected Sharpe";
   const sharpe=input.objective==="Maximum Sharpe",mu=input.expectedReturns??Array(n).fill(0);
-  if(sharpe&&(mu.length!==n||mu.some(v=>!Number.isFinite(v))||!mu.some(v=>Math.abs(v)>1e-10)))return empty("Invalid inputs",input.returnInputKind==="preferences"?"Choose a preference rule with finite, non-zero scores.":"Enter annual expected excess returns for maximum expected Sharpe. Blank values mean zero.");
+  if(sharpe&&(mu.length!==n||mu.some(v=>!Number.isFinite(v))||!mu.some(v=>Math.abs(v)>1e-10)))return empty("Invalid inputs",input.returnInputKind==="preferences"?"Choose a return assumption with finite, non-zero values.":"Enter annual expected excess returns for maximum expected Sharpe. Blank values mean zero.");
   if(sharpe&&input.longOnly&&mu.every(v=>v<=0))return empty("Invalid inputs",`${objectiveName} requires a feasible portfolio with positive ${scoreName}.`);
   if(sharpe&&input.longOnly&&netMax===0)return empty("Invalid inputs",`A long-only portfolio with zero net exposure cannot have positive ${scoreName}.`);
   const zeroNetMessage=sharpe?zeroNetRatioMessage(mu,netMin,netMax,input.returnInputKind):"";

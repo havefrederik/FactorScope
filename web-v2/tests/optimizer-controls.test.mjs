@@ -48,21 +48,20 @@ test('locks, nonnegative stock bounds, change limits and trading budget can all 
   assert.equal(shortExposureStatus({...base,current:[1.1,-.1],gross:1.6,turnoverCap:0}).blocked,false);
   assert.equal(shortExposureStatus({...base,gross:1.6,positionBounds:[{min:1,max:0},{min:null,max:null}]}).severity,'error');
 });
-test('switching objectives distinguishes units and preserves compatible saved configurations', () => {
-  for(const assumption of ['Idiosyncratic volatility proportionate','Equal preferences']) {
-    assert.equal(objectiveChoice('Maximum Sharpe',assumption),'Maximum preference / risk');
-    assert.deepEqual(selectObjective('Maximum preference / risk',assumption),{objective:'Maximum Sharpe',assumption});
-    assert.deepEqual(selectObjective('Maximum expected Sharpe',assumption),{objective:'Maximum Sharpe',assumption:'Manual forecasts'});
+test('objective and all three return assumptions stay independent across switches', () => {
+  for(const assumption of ['Proportional to idiosyncratic volatility','Proportional to total volatility','My return forecasts']) {
+    assert.equal(objectiveChoice('Maximum Sharpe',assumption),'Maximum return / risk');
+    for(const choice of ['Minimum volatility','Minimum tracking error','Maximum return / risk']) {
+      const selected=selectObjective(choice,assumption);
+      assert.equal(selected.assumption,assumption);
+      assert.equal(objectiveChoice(selected.objective,assumption),choice);
+    }
   }
-  assert.equal(objectiveChoice('Maximum Sharpe','Manual forecasts'),'Maximum expected Sharpe');
-  assert.equal(selectObjective('Maximum preference / risk','Manual forecasts').assumption,'Idiosyncratic volatility proportionate');
-  for(const objective of ['Minimum volatility','Minimum tracking error'])
-    assert.equal(objectiveChoice(objective,'Manual forecasts'),objective);
 });
 test('validation names the actual score type; neither mode silently supplies a forecast', () => {
   const preference=solve({expectedReturns:[0,0]});
   assert.equal(preference.status,'Invalid inputs');
-  assert.match(preference.message,/preference/); assert.doesNotMatch(preference.message,/Sharpe/);
+  assert.match(preference.message,/return assumption/); assert.doesNotMatch(preference.message,/Sharpe/);
   const manual=solve({returnInputKind:'forecasts',expectedReturns:[0,0]});
   assert.equal(manual.status,'Invalid inputs'); assert.match(manual.message,/expected excess returns/);
   const supplied=solve({returnInputKind:'forecasts',expectedReturns:[.03,.1],gross:1.6});

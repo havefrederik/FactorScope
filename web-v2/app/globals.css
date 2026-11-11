@@ -813,7 +813,7 @@
 .compare-controls .compare-saved[open]{flex-basis:100%}
 .compare-controls .compare-saved[open] summary{margin-left:0}
 .compare-allocation-status{padding:7px 12px;border-bottom:1px solid var(--line);font-size:10px;line-height:1.5;color:var(--muted)}
-.compare-preference-basis{margin:0;padding:7px 12px;border-bottom:1px solid var(--line);color:var(--muted);font-size:10px;line-height:1.5}
+.compare-assumption-basis{margin:0;padding:7px 12px;border-bottom:1px solid var(--line);color:var(--muted);font-size:10px;line-height:1.5}
 .compare-workspace .compare-summary th small{max-width:none;white-space:normal;line-height:1.4}
 .compare-workspace .compare-summary .panel-title{align-items:center}
 .compare-workspace .compare-summary .panel-title span{font-size:10px;line-height:1.5}

@@ -1,17 +1,15 @@
 import type { OptimizerInput } from './portfolio-optimizer';
 import type { ReturnAssumption } from './optimizer-returns';
 
-export const objectiveChoices = ['Minimum volatility', 'Maximum preference / risk', 'Maximum expected Sharpe', 'Minimum tracking error'] as const;
+export const objectiveChoices = ['Minimum volatility', 'Maximum return / risk', 'Minimum tracking error'] as const;
 export type ObjectiveChoice = typeof objectiveChoices[number];
 
-// Keep the saved solver objective compatible; the UI must distinguish its inputs.
-export function objectiveChoice(objective: OptimizerInput['objective'], assumption: ReturnAssumption): ObjectiveChoice {
-  return objective === 'Maximum Sharpe' ? assumption === 'Manual forecasts' ? 'Maximum expected Sharpe' : 'Maximum preference / risk' : objective;
+// The return assumption controls input units, independently of the objective.
+export function objectiveChoice(objective: OptimizerInput['objective'], _assumption?: string): ObjectiveChoice {
+  return objective === 'Maximum Sharpe' ? 'Maximum return / risk' : objective;
 }
 export function selectObjective(choice: ObjectiveChoice, assumption: ReturnAssumption): { objective: OptimizerInput['objective']; assumption: ReturnAssumption } {
-  if (choice === 'Maximum expected Sharpe') return { objective: 'Maximum Sharpe', assumption: 'Manual forecasts' };
-  if (choice === 'Maximum preference / risk') return { objective: 'Maximum Sharpe', assumption: assumption === 'Manual forecasts' ? 'Idiosyncratic volatility proportionate' : assumption };
-  return { objective: choice, assumption };
+  return { objective: choice === 'Maximum return / risk' ? 'Maximum Sharpe' : choice, assumption };
 }
 
 export const exposurePresets = [

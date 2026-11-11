@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildOptimizerReturns, restoreReturnAssumption, returnAssumptions, relativeSignalIndex } from "../lib/optimizer-returns.ts";
+import { buildOptimizerReturns, restoreReturnAssumption, returnAssumptions, compareReturnRisk } from "../lib/optimizer-returns.ts";
 import { optimizePortfolio } from "../lib/portfolio-optimizer.ts";
 
 const input = { tickers: ["AAA", "BBB", "CCC"], current: [.6, -.2, 0], mode: "Proportional to idiosyncratic volatility", side: "both", idiosyncraticVolatility: [.1, .2, .3] };
@@ -58,6 +58,32 @@ test("total-volatility optimization matches the two-asset maximum-diversificatio
   // For two assets with rho < 1, maximum diversification gives inverse-vol weights.
   assert.ok(Math.abs(a.weights[0]-.6)<5e-5);
   a.weights.forEach((v,i)=>assert.ok(Math.abs(v-b.weights[i])<5e-5));
-  assert.ok(relativeSignalIndex(scores,current,a.weights,a.currentVolatility,a.volatility)>100);
-  assert.equal(relativeSignalIndex(scores,[0,0],a.weights,0,a.volatility),null);
+  assert.ok(compareReturnRisk(scores,current,a.weights,a.currentVolatility,a.volatility).ratioChange>0);
+  assert.equal(compareReturnRisk(scores,[0,0],a.weights,0,a.volatility).ratioChange,null);
+});
+
+
+test("relative return/risk improvement decomposes into return and volatility changes without a return scale", () => {
+  const a=compareReturnRisk([1,1],[.5,.5],[.8,.2],.355,.261);
+  close(a.returnChange,0); close(a.riskChange,.261/.355-1); close(a.ratioChange,.355/.261-1);
+  const b=compareReturnRisk([7,7],[.5,.5],[.8,.2],.355,.261);
+  close(a.ratioChange,b.ratioChange); close(a.returnChange,b.returnChange);
+  // Ratio can improve even as assumed return falls, if risk falls further.
+  const c=compareReturnRisk([1,2],[.5,.5],[1,0],.3,.15);
+  close(c.returnChange,-1/3); close(c.riskChange,-.5); close(c.ratioChange,1/3);
+  close(1+c.ratioChange,(1+c.returnChange)/(1+c.riskChange));
+  close(compareReturnRisk([1,2],[.5,.5],[.5,.5],.3,.3).ratioChange,0);
+});
+test("ratio improvement never divides by a nonpositive baseline or zero volatility", () => {
+  for(const [views,current,vol] of [[[0,0],[.5,.5],.2],[[-1,-2],[.5,.5],.2],[[1,2],[.5,.5],0]])
+    assert.equal(compareReturnRisk(views,current,[1,0],vol,.2).ratioChange,null);
+  assert.equal(compareReturnRisk([1,2],[.5,.5],[1,0],.2,0).ratioChange,null);
+  assert.equal(compareReturnRisk([1],[1],[-1],.2,.2).ratioChange,-2);
+  for(const patch of [[[],[],[],.2,.2],[[1],[1,2],[1],.2,.2],[[NaN],[1],[1],.2,.2],[[1],[1],[Infinity],.2,.2],[[1],[1],[1],-.2,.2]])
+    assert.equal(compareReturnRisk(...patch),null);
+});
+test("explicit annual excess returns identify expected Sharpe, including negative forecasts", () => {
+  const result=compareReturnRisk([.06,-.02],[1,0],[.5,-.5],.2,.1);
+  close(result.currentReturn,.06); close(result.proposedReturn,.04);
+  close(result.currentRatio,.3); close(result.proposedRatio,.4);
 });

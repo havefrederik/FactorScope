@@ -36,8 +36,21 @@ export function buildOptimizerReturns({ tickers, current, mode, side, idiosyncra
     return direction * risk[i] / averageRisk;
   });
 }
-export function relativeSignalIndex(signal:number[], current:number[], proposed:number[], currentVol:number, proposedVol:number): number|null {
-  const dot=(w:number[])=>w.reduce((s,v,i)=>s+v*signal[i],0);
-  const baseline=dot(current);
-  return baseline>1e-12&&currentVol>1e-12&&proposedVol>1e-12?100*(dot(proposed)/proposedVol)/(baseline/currentVol):null;
+// Changes are fractions (0.36 means 36% higher), never a calibrated Sharpe.
+// Both allocations must use the same dated return vector and covariance.
+export function compareReturnRisk(returns: number[], current: number[], proposed: number[], currentVol: number, proposedVol: number) {
+  if (!returns.length || current.length !== returns.length || proposed.length !== returns.length ||
+      [...returns, ...current, ...proposed, currentVol, proposedVol].some(v => !Number.isFinite(v)) || currentVol < 0 || proposedVol < 0) return null;
+  const dot = (weights: number[]) => weights.reduce((sum, w, i) => sum + w * returns[i], 0);
+  const currentReturn = dot(current), proposedReturn = dot(proposed);
+  const currentRatio = currentVol > 1e-10 ? currentReturn / currentVol : null;
+  const proposedRatio = proposedVol > 1e-10 ? proposedReturn / proposedVol : null;
+  const finite = (value: number | null) => value !== null && Number.isFinite(value) ? value : null;
+  return {
+    currentReturn: finite(currentReturn), proposedReturn: finite(proposedReturn),
+    currentRatio: finite(currentRatio), proposedRatio: finite(proposedRatio),
+    returnChange: finite(currentReturn > 1e-10 ? (proposedReturn - currentReturn) / currentReturn : null),
+    riskChange: finite(currentVol > 1e-10 ? (proposedVol - currentVol) / currentVol : null),
+    ratioChange: finite(currentReturn > 1e-10 && currentRatio !== null && proposedRatio !== null ? proposedRatio / currentRatio - 1 : null),
+  };
 }

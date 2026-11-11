@@ -4,12 +4,13 @@ import test from "node:test";
 
 test("strategy analysis is point-in-time, risk targeted and explicit about constraints", async () => {
   const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8") + await readFile(new URL("../app/strategy-workspace.tsx", import.meta.url), "utf8");
+  const about = await readFile(new URL("../app/about-methodology.tsx", import.meta.url), "utf8");
   const analytics = await readFile(new URL("../lib/analytics.ts", import.meta.url), "utf8");
   const allocator = await readFile(new URL("../lib/risk-allocation.ts", import.meta.url), "utf8");
 
   assert.match(page, /"Strategy Analysis"/);
   assert.match(page, /Allocation constraints/);
-  assert.match(page, /convex direction/);
+  assert.match(about, /convex direction/);
   assert.match(page, /Run backtest/);
   assert.match(page, /Current → Proposed/);
   assert.match(page, /Current/);
@@ -27,9 +28,9 @@ test("strategy analysis is point-in-time, risk targeted and explicit about const
   assert.match(page, /Sharpe ratio/);
   assert.match(page, /CM-IEWMA/);
   assert.doesNotMatch(page, /Rolling 126-day/);
-  assert.match(page, /Market betas use the preceding 126 sessions/);
+  assert.match(about, /Market betas use the preceding 126 sessions/);
   assert.match(page, /next session/);
-  assert.match(page, /tightest risk, beta, position or capital ceiling/);
+  assert.match(about, /tightest risk, beta, position or capital ceiling/);
   assert.match(page, /Risk budget → share/);
 
   assert.match(analytics, /export function buildRiskTargetStrategy/);

@@ -974,3 +974,18 @@
 .return-risk-result table{width:100%}.return-risk-result th,.return-risk-result td{padding:10px 12px;font-size:11px}
 .return-risk-result .return-risk-sharpe td{font-size:21px}
 @media(max-width:480px){.return-risk-headline strong{font-size:24px}.return-risk-result th,.return-risk-result td{padding:8px}}
+
+/* First-class strategy workspaces: compact purpose and shared setup. */
+.hindsight-workspace{display:grid;gap:14px;min-width:0}
+.hindsight-workspace[hidden]{display:none}
+.strategy-purpose{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 16px}
+.strategy-purpose h2{font-size:15px;margin:0 0 6px;font-weight:600}
+.strategy-purpose p{font-size:12px;color:var(--muted);margin:5px 0;line-height:1.5}
+.strategy-purpose strong{display:block;font-size:12px;margin-top:10px;font-weight:500}
+.strategy-purpose small{font-size:11px;color:var(--muted);line-height:1.5}
+.strategy-purpose-actions{display:flex;flex-direction:column;align-items:flex-end;gap:9px;flex-shrink:0}
+.strategy-purpose-actions button{padding:8px 12px;background:#292c25;color:var(--text);border:1px solid var(--line2);border-radius:4px;font-size:12px;cursor:pointer}
+.strategy-purpose-actions a{color:var(--muted);font-size:11px;text-decoration:underline;text-underline-offset:4px}
+.optimizer-backtest>.panel-title{padding:12px 14px;min-height:44px;height:auto}
+.optimizer-backtest>.optimizer-factor-note{padding-top:12px}
+@media(max-width:760px){.strategy-purpose{align-items:flex-start;flex-direction:column}.strategy-purpose-actions{flex-direction:row;flex-wrap:wrap;align-items:center;gap:12px}}

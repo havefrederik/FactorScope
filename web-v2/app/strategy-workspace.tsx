@@ -5,6 +5,7 @@ import { buildAnalytics, buildFactorModel, type MarketPayload, type RiskTargetSn
 
 export type StrategySettings = { frequency: StrategyRebalanceFrequency; targetVolatility: number; targetBeta: number; maxPosition: number };
 export type StrategyWorkspaceProps = {
+  onHindsight?: () => void;
   strategy: StrategyBacktestAnalytics | null;
   snapshot: RiskTargetSnapshot | null;
   isUpdating: boolean;
@@ -72,6 +73,7 @@ export default function StrategyWorkspace(props: StrategyWorkspaceProps & {
   const years = (Date.parse(strategy.endDate) - Date.parse(strategy.startDate)) / (365.25 * 86400000);
   const cagr = years > 0 && strategy.totalReturn > -1 ? (1 + strategy.totalReturn) ** (1 / years) - 1 : null;
   return <section className="lab-workspace">
+    <header className="panel strategy-purpose"><div><h2>Risk Targeting</h2><p>A fixed CM-IEWMA rule: allocate risk across long positions, then scale stocks and cash to stay within your ceilings.</p><small>Weekly or monthly rebalancing · no shorts or leverage · separate from your Optimizer setup</small></div>{props.onHindsight&&<div className="strategy-purpose-actions"><button onClick={props.onHindsight}>Test other models in Hindsight Lab →</button><a href="#about-risk-targeting" onClick={()=>window.dispatchEvent(new CustomEvent("factorscope-open-about"))}>Methodology ↗</a></div>}</header>
     <div className="lab-construction">
       <aside className="panel lab-settings">
         <header className="panel-title"><h3>Allocation constraints</h3><span>Preview updates immediately</span></header>
@@ -105,7 +107,7 @@ export default function StrategyWorkspace(props: StrategyWorkspaceProps & {
       {chartTab === "Risk exposures" && <>{props.renderExposures(strategy, applied)}<p className="lab-note">Dashed lines show the applied forecast ceilings. Realized risk can differ. Weights become effective next session and drift until the next rebalance.</p></>}
       {chartTab === "Rebalances" && <div className="lab-history-scroll">{strategy.rebalances.slice().reverse().map(item => <details className="lab-rebalance" key={item.date}><summary><b>{item.date}</b><span>Risk {percent(item.estimatedVolatility)}</span><span>Beta {item.beta.toFixed(2)}</span><span>Cash {percent(1 - item.investedWeight)}</span><span>Turnover {percent(item.turnover)}</span></summary><table><thead><tr><th>Stock</th><th>Target weight</th><th>Risk share</th></tr></thead><tbody>{item.weights.map(weight => <tr key={weight.ticker}><th><button className="lab-stock" onClick={() => props.onSelectTicker(weight.ticker)}>{weight.ticker} ↗</button></th><td>{percent(weight.weight)}</td><td>{percent(weight.riskContribution)}</td></tr>)}<tr><th>CASH</th><td>{percent(1 - item.investedWeight)}</td><td>—</td></tr></tbody></table></details>)}</div>}
       {chartTab === "Ending holdings" && <div className="lab-history-scroll"><p className="lab-note">Actual weights after final market drift on {strategy.endDate}. Historical performance comes from the entire allocation sequence.</p><table><thead><tr><th>Stock</th><th>Ending weight</th></tr></thead><tbody>{strategy.finalWeights.map(item => <tr key={item.ticker}><th><button className="lab-stock" onClick={() => props.onSelectTicker(item.ticker)}>{item.ticker} ↗</button></th><td>{percent(item.weight)}</td></tr>)}<tr><th>CASH</th><td>{percent(Math.max(0, 1 - strategy.finalWeights.reduce((sum, item) => sum + item.weight, 0)))}</td></tr></tbody></table></div>}
-      <details className="lab-method"><summary>Allocation method &amp; assumptions</summary><p>CM-IEWMA forecasts covariance using five IEWMA experts. The convex direction minimizes ½x′Σx − Σρᵢ log xᵢ, with risk budgets set by current stock capital proportions. The tightest risk, beta, position or capital ceiling scales every risky position by the same amount; cash receives the remainder. This construction does not use expected returns or maximize Sharpe.</p><p>At each historical rebalance, only preceding information is used. Market betas use the preceding 126 sessions. No leverage or shorts; cash earns 0%. The universe and risk budgets come from the selected holdings snapshot, so this is a separate hypothetical strategy with a fixed universe, rather than a reconstruction of the illustrative portfolio’s monthly selections.</p><p>References: <a href="https://github.com/cvxgrp/cov_pred_finance" target="_blank" rel="noreferrer">Johansson et al., covariance prediction</a>; Johansson, <em>Convex Optimization for Quantitative Finance</em> (2025), chapter 6.</p></details>
+
     </section>
   </section>;
 }

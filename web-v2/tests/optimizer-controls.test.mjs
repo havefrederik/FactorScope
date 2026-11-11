@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { objectiveChoice, selectObjective, shortExposureStatus, exposurePresets, matchingExposurePreset, minimumNetTrade } from '../lib/optimizer-controls.ts';
+import { objectiveChoices, objectiveChoice, selectObjective, shortExposureStatus, exposurePresets, matchingExposurePreset, minimumNetTrade } from '../lib/optimizer-controls.ts';
 import { optimizePortfolio } from '../lib/portfolio-optimizer.ts';
 
 const base = { current: [.5, .5], longOnly: false, net: 1, gross: 1, positionCap: 2, turnoverCap: null, changeCap: null, locked: [] };
@@ -48,19 +48,27 @@ test('locks, nonnegative stock bounds, change limits and trading budget can all 
   assert.equal(shortExposureStatus({...base,current:[1.1,-.1],gross:1.6,turnoverCap:0}).blocked,false);
   assert.equal(shortExposureStatus({...base,gross:1.6,positionBounds:[{min:1,max:0},{min:null,max:null}]}).severity,'error');
 });
-test('objective labels follow the assumption while objective switches preserve the selected inputs', () => {
-  const labels = {
-    'Proportional to total volatility': 'Maximum diversification',
-    'Proportional to idiosyncratic volatility': 'Maximum idiosyncratic return / risk',
-    'My return forecasts': 'Maximum expected Sharpe',
+test('every explicit objective selects its inputs regardless of the previously selected assumption', () => {
+  const mapping = {
+    'Maximum diversification': 'Proportional to total volatility',
+    'Maximum idiosyncratic return / risk': 'Proportional to idiosyncratic volatility',
+    'Maximum expected Sharpe': 'My return forecasts',
   };
-  for(const [assumption,label] of Object.entries(labels)) {
-    assert.equal(objectiveChoice('Maximum Sharpe',assumption),label);
-    for(const choice of ['Minimum volatility','Minimum tracking error','Maximum return / risk']) {
-      const selected=selectObjective(choice,assumption);
-      assert.equal(selected.assumption,assumption);
-      assert.equal(objectiveChoice(selected.objective,assumption),choice==='Maximum return / risk'?label:choice);
+  assert.equal(objectiveChoices.length, 5);
+  for (const previous of Object.values(mapping)) {
+    for (const choice of objectiveChoices) {
+      const selected = selectObjective(choice, previous);
+      assert.equal(selected.assumption, mapping[choice] ?? previous);
+      assert.equal(selected.objective, mapping[choice] ? 'Maximum Sharpe' : choice);
+      assert.equal(objectiveChoice(selected.objective, selected.assumption), choice);
     }
+  }
+});
+test('saved solver and return-assumption pairs restore to the matching explicit objective', () => {
+  for (const choice of objectiveChoices) {
+    const settings = selectObjective(choice, 'Proportional to idiosyncratic volatility');
+    const restored = JSON.parse(JSON.stringify(settings));
+    assert.equal(objectiveChoice(restored.objective, restored.assumption), choice);
   }
 });
 test('validation names the actual score type; neither mode silently supplies a forecast', () => {

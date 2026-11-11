@@ -23,7 +23,7 @@ test("supports direct weight editing and saved-baseline portfolio comparison", a
   assert.match(page, /aria-label={`\$\{h\.ticker\} portfolio weight`}/);
   assert.match(page, /"Compare": \["Portfolio comparison"/);
   assert.match(page, /Save current as baseline/);
-  assert.match(page, /secondaryLabel="Alternative portfolio"/);
+  assert.match(page, /secondaryLabel="Replayed sizing"/);
   assert.match(page, /Allocation changes/);
   assert.match(page, /Factor comparison/);
   assert.match(page, /setBaselineHoldings\(portfolio\.map/);

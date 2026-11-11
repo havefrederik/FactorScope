@@ -978,6 +978,11 @@
 /* First-class strategy workspaces: compact purpose and shared setup. */
 .hindsight-workspace{display:grid;gap:14px;min-width:0}
 .hindsight-workspace[hidden]{display:none}
+.optimizer-shared-setup{display:grid;gap:14px;border:0;padding:0;margin:0;min-width:0}
+.optimizer-stock-limits{min-width:0}
+.optimizer-stock-limits>summary{padding:14px 16px;font-size:12px;cursor:pointer}
+.optimizer-stock-limits .optimizer-allocations{min-width:0}
+#hindsight-lab{scroll-margin-top:18px}
 .strategy-purpose{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 16px}
 .strategy-purpose h2{font-size:15px;margin:0 0 6px;font-weight:600}
 .strategy-purpose p{font-size:12px;color:var(--muted);margin:5px 0;line-height:1.5}

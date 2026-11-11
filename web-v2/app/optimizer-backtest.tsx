@@ -14,7 +14,7 @@ const defaults:ReoptimizationPolicy={infeasibleAction:'Hold existing positions',
 const bps=(x:number|undefined)=>x===undefined?'—':`${(x*10000).toFixed(2)} bps`;
 const pct=(x:number)=>`${(x*100).toFixed(2)}%`;
 function download(name:string,value:unknown){const u=URL.createObjectURL(new Blob([JSON.stringify(value,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),1000);}
-export default function OptimizerBacktest({payload,tickers,initial,history,reference,buildModel,unavailable,modelSignature,onLoadSettings}:{payload:MarketPayload;tickers:string[];initial:number[];history?:ExamplePortfolioResult|null;reference?:PortfolioAnalytics|null;buildModel:(date:string,weights:number[])=>OptimizerInput;unavailable:string;modelSignature:string;onLoadSettings:(name:string,raw:string)=>void}){
+export default function OptimizerBacktest({payload,tickers,initial,history,reference,buildModel,unavailable,modelSignature,onLoadSettings,onBusyChange}:{payload:MarketPayload;tickers:string[];initial:number[];history?:ExamplePortfolioResult|null;reference?:PortfolioAnalytics|null;buildModel:(date:string,weights:number[])=>OptimizerInput;unavailable:string;modelSignature:string;onLoadSettings:(name:string,raw:string)=>void;onBusyChange?:(busy:boolean)=>void}){
  const earliest=tickers.map(t=>payload.series[t]?.points[253]?.date??'9999').sort().at(-1)??'';
  const [start,setStart]=useState(earliest),[end,setEnd]=useState([payload.asOf,reference?.endDate].filter(Boolean).sort()[0]??'');
  const [policy,setPolicy]=useState<ReoptimizationPolicy>(defaults);
@@ -22,6 +22,7 @@ export default function OptimizerBacktest({payload,tickers,initial,history,refer
  const [signature,setSignature]=useState(''),[runs,setRuns]=useState<HindsightRun[]>([]),[activeId,setActiveId]=useState(''),[name,setName]=useState(''),[storageNotice,setStorageNotice]=useState('');
  const [audit,setAudit]=useState<unknown>(null);
  useEffect(()=>{try{setRuns(readHindsightRuns(localStorage.getItem(storage)));}catch{setStorageNotice('Browser storage is unavailable; export runs to keep them.');}},[]);
+ useEffect(()=>{onBusyChange?.(busy);},[busy,onBusyChange]);
  const dataFingerprint=useMemo(()=>historyFingerprint([...([...tickers,'SPY','BIL'].map(t=>payload.series[t]?.points??[])),...(payload.academicFactors?Array.from({length:7},(_,k)=>payload.academicFactors!.rows.map(r=>({date:r.date,close:k===6?r.rf:r.values[k]}))):[])]),[payload,tickers.join('|')]);
  const config=JSON.stringify([start,end,policy,tickers,modelSignature,dataFingerprint]);
  const patch=(p:Partial<ReoptimizationPolicy>)=>setPolicy(old=>({...old,...p}));
@@ -42,7 +43,7 @@ export default function OptimizerBacktest({payload,tickers,initial,history,refer
  const exampleBenefit=riskReductionValue(.3**2,.28**2,policy.riskAversion,policy.horizon);
  function load(r:HindsightRun){setStart(r.start);setEnd(r.end);setPolicy({...defaults,...r.policy});setName(r.name+' variant');onLoadSettings(r.name,r.modelSignature);}
  return <section id="hindsight-lab" aria-label="Historical optimizer test" className="panel optimizer-config optimizer-backtest"><header className="panel-title"><h3>Test period &amp; rebalance rules</h3></header>
- <p className="optimizer-factor-note">Uses the setup selected in Optimizer; no allocation proposal needs to be run first. Each historical decision re-estimates the model from preceding observations. Run different setups to compare their results.</p>
+ <p className="optimizer-factor-note">Uses the model, objective and constraints above. Each decision re-estimates the model using preceding observations, then applies your trading rules. No one-date optimization is required.</p>
  {unavailable?<p className="optimizer-error">{unavailable}</p>:<><fieldset disabled={busy} className="optimizer-config-controls hindsight-controls">
  <label>Run name<input aria-label="Hindsight run name" value={name} placeholder={`Run ${runs.length+1}`} onChange={e=>setName(e.target.value)}/></label>
  <label>From<input aria-label="Hindsight start date" type="date" min={earliest} max={end} value={start} onChange={e=>setStart(e.target.value)}/></label>

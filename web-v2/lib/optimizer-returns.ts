@@ -1,8 +1,9 @@
-export const returnAssumptions = ["Proportional to idiosyncratic volatility", "Proportional to total volatility", "My return forecasts"] as const;
+export const returnAssumptions = ["Proportional to total volatility", "Proportional to idiosyncratic volatility", "My return forecasts"] as const;
 export type ReturnAssumption = typeof returnAssumptions[number];
+export const defaultReturnAssumption: ReturnAssumption = "Proportional to total volatility";
 
 export function restoreReturnAssumption(value: unknown): ReturnAssumption {
-  if (value === "Idiosyncratic volatility proportionate") return returnAssumptions[0];
+  if (value === "Idiosyncratic volatility proportionate") return "Proportional to idiosyncratic volatility";
   if (value === "Manual forecasts") return "My return forecasts";
   if (value === "Equal preferences") throw Error("This saved configuration uses the retired equal-score rule. Choose one of the three return assumptions and save new settings; no settings have been changed.");
   if (!returnAssumptions.includes(value as ReturnAssumption)) throw Error("Choose a supported return assumption.");

@@ -48,13 +48,18 @@ test('locks, nonnegative stock bounds, change limits and trading budget can all 
   assert.equal(shortExposureStatus({...base,current:[1.1,-.1],gross:1.6,turnoverCap:0}).blocked,false);
   assert.equal(shortExposureStatus({...base,gross:1.6,positionBounds:[{min:1,max:0},{min:null,max:null}]}).severity,'error');
 });
-test('objective and all three return assumptions stay independent across switches', () => {
-  for(const assumption of ['Proportional to idiosyncratic volatility','Proportional to total volatility','My return forecasts']) {
-    assert.equal(objectiveChoice('Maximum Sharpe',assumption),'Maximum return / risk');
+test('objective labels follow the assumption while objective switches preserve the selected inputs', () => {
+  const labels = {
+    'Proportional to total volatility': 'Maximum diversification',
+    'Proportional to idiosyncratic volatility': 'Maximum idiosyncratic return / risk',
+    'My return forecasts': 'Maximum expected Sharpe',
+  };
+  for(const [assumption,label] of Object.entries(labels)) {
+    assert.equal(objectiveChoice('Maximum Sharpe',assumption),label);
     for(const choice of ['Minimum volatility','Minimum tracking error','Maximum return / risk']) {
       const selected=selectObjective(choice,assumption);
       assert.equal(selected.assumption,assumption);
-      assert.equal(objectiveChoice(selected.objective,assumption),choice);
+      assert.equal(objectiveChoice(selected.objective,assumption),choice==='Maximum return / risk'?label:choice);
     }
   }
 });

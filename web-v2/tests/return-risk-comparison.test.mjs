@@ -18,6 +18,14 @@ test("objective summary reports relative improvements for risk assumptions and e
       const html = render({ assumption });
       assert.match(html, /36\.0% higher/); assert.match(html, /26\.5% lower/); assert.match(html, /Unchanged/);
       assert.match(html, /No absolute return forecast is implied/);
+      if (assumption === "Proportional to total volatility") {
+        assert.match(html, /<h3>Diversification<\/h3>/);
+        assert.match(html, /Weighted stock volatility/);
+        assert.doesNotMatch(html, /<dt>Assumed return/);
+      } else {
+        assert.match(html, /<h3>Idiosyncratic return \/ risk<\/h3>/);
+        assert.match(html, /<dt>Assumed return/);
+      }
       assert.doesNotMatch(html, /Expected Sharpe|current = 100|conditional Sharpe|index/i);
     }
     const manual = render({ assumption: "My return forecasts", returns: [.06,.06], currentVol: .2, proposedVol: .15 });

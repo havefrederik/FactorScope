@@ -4,9 +4,12 @@ import type { ReturnAssumption } from './optimizer-returns';
 export const objectiveChoices = ['Minimum volatility', 'Maximum return / risk', 'Minimum tracking error'] as const;
 export type ObjectiveChoice = typeof objectiveChoices[number];
 
-// The return assumption controls input units, independently of the objective.
-export function objectiveChoice(objective: OptimizerInput['objective'], _assumption?: string): ObjectiveChoice {
-  return objective === 'Maximum Sharpe' ? 'Maximum return / risk' : objective;
+// Keep the saved solver objective stable; describe the actual selected numerator.
+export function objectiveChoice(objective: OptimizerInput['objective'], assumption?: string): string {
+  if (objective !== 'Maximum Sharpe') return objective;
+  if (assumption === 'Proportional to total volatility') return 'Maximum diversification';
+  if (assumption === 'My return forecasts') return 'Maximum expected Sharpe';
+  return assumption === 'Proportional to idiosyncratic volatility' ? 'Maximum idiosyncratic return / risk' : 'Maximum return / risk';
 }
 export function selectObjective(choice: ObjectiveChoice, assumption: ReturnAssumption): { objective: OptimizerInput['objective']; assumption: ReturnAssumption } {
   return { objective: choice === 'Maximum return / risk' ? 'Maximum Sharpe' : choice, assumption };

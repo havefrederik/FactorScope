@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildOptimizerReturns, restoreReturnAssumption, returnAssumptions, compareReturnRisk } from "../lib/optimizer-returns.ts";
+import { buildOptimizerReturns, restoreReturnAssumption, returnAssumptions, defaultReturnAssumption, compareReturnRisk } from "../lib/optimizer-returns.ts";
 import { optimizePortfolio } from "../lib/portfolio-optimizer.ts";
 
 const input = { tickers: ["AAA", "BBB", "CCC"], current: [.6, -.2, 0], mode: "Proportional to idiosyncratic volatility", side: "both", idiosyncraticVolatility: [.1, .2, .3] };
@@ -39,7 +39,7 @@ test("preset feeds Sharpe optimization without individual forecasts, including s
 test("saved assumptions migrate without changing meanings or silently replacing retired rules", () => {
   assert.equal(returnAssumptions.length,3);
   for(const mode of returnAssumptions) assert.equal(restoreReturnAssumption(JSON.parse(JSON.stringify(mode))),mode);
-  assert.equal(restoreReturnAssumption("Idiosyncratic volatility proportionate"),returnAssumptions[0]);
+  assert.equal(restoreReturnAssumption("Idiosyncratic volatility proportionate"),"Proportional to idiosyncratic volatility");
   assert.equal(restoreReturnAssumption("Manual forecasts"),"My return forecasts");
   assert.throws(()=>restoreReturnAssumption("Equal preferences"),/retired/);
   for(const mode of [null,{},"unrecognized"]) assert.throws(()=>restoreReturnAssumption(mode));
@@ -49,16 +49,26 @@ test("total-volatility validation fails on missing, misaligned, negative, zero o
     assert.throws(()=>buildOptimizerReturns({...input,mode:"Proportional to total volatility",covariance}));
   assert.throws(()=>buildOptimizerReturns({...input,current:[NaN,0,0]}));
 });
-test("total-volatility optimization matches the two-asset maximum-diversification solution and common return scaling", () => {
+test("default total-volatility optimization matches the two-asset maximum-diversification solution and common return scaling", () => {
+  assert.equal(defaultReturnAssumption,'Proportional to total volatility');
   const covariance=[[.04,.018],[.018,.09]], current=[.5,.5];
-  const scores=buildOptimizerReturns({...input,tickers:['A','B'],current,side:'long',mode:'Proportional to total volatility',covariance});
+  const scores=buildOptimizerReturns({...input,tickers:['A','B'],current,side:'long',mode:defaultReturnAssumption,covariance});
   const config={covariance,current,objective:'Maximum Sharpe',returnInputKind:'preferences',longOnly:true,net:1,gross:1,positionCap:1,turnoverCap:null,changeCap:null,locked:[],exposures:[]};
   const a=optimizePortfolio({...config,expectedReturns:scores}),b=optimizePortfolio({...config,expectedReturns:scores.map(v=>v*3)});
   assert.equal(a.status,'Solved',a.message); assert.equal(b.status,'Solved',b.message);
   // For two assets with rho < 1, maximum diversification gives inverse-vol weights.
   assert.ok(Math.abs(a.weights[0]-.6)<5e-5);
   a.weights.forEach((v,i)=>assert.ok(Math.abs(v-b.weights[i])<5e-5));
-  assert.ok(compareReturnRisk(scores,current,a.weights,a.currentVolatility,a.volatility).ratioChange>0);
+  const change=compareReturnRisk(scores,current,a.weights,a.currentVolatility,a.volatility).ratioChange;
+  const standalone=weights=>weights[0]*.2+weights[1]*.3;
+  close(change,(standalone(a.weights)/a.volatility)/(standalone(current)/a.currentVolatility)-1);
+  assert.ok(change>0);
+  // Residual-risk inputs differ from total volatility; the retained option must
+  // produce its own allocation, not silently inherit the new default.
+  const idioScores=buildOptimizerReturns({...input,tickers:['A','B'],current,side:'long',idiosyncraticVolatility:[.15,.05]});
+  const idio=optimizePortfolio({...config,expectedReturns:idioScores});
+  assert.equal(idio.status,'Solved',idio.message);
+  assert.ok(Math.abs(idio.weights[0]-a.weights[0])>.1);
   assert.equal(compareReturnRisk(scores,[0,0],a.weights,0,a.volatility).ratioChange,null);
 });
 

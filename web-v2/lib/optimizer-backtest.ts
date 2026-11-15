@@ -54,6 +54,10 @@ export async function backtestOptimizer(payload:MarketPayload,tickers:string[],s
   const trigger=d===0||policy.interval!=='Once'&&(policy.trigger==='Interval'?scheduled:policy.trigger==='Weight drift'?drift:policy.trigger==='Volatility ceiling'?breached:scheduled||drift||breached);
   if(trigger){input??=model(dates[d],current);decisions++;
    riskChecks.push({index:d,sessions:input.riskHorizonSessions??1,weights:current.slice(),annualVariance:variance(current,input.covariance),excess:input.riskReturnBasis==='excess'});
+   if (input.objective === "Maximum Sharpe" && input.returnInputKind === "forecasts" && !input.expectedReturns?.some(v=>Math.abs(v)>1e-12)) {
+    events.push({decisionDate:dates[d],executionDate:"",status:"Skipped: no active non-zero forecast",turnover:0,cost:0,forecastVolatility:Math.sqrt(Math.max(0,variance(current,input.covariance))),weights:current.slice()});
+    onProgress?.(d/dates.length);await new Promise<void>(resolve=>setTimeout(resolve,0));continue;
+   }
    const solved=optimizePortfolio(input);
    if(solved.status==='Infeasible'){
     if(policy.infeasibleAction==='Stop the run')throw Error(`${dates[d]}: ${solved.message} The run stopped as requested; incomplete results are not saved.`);
@@ -71,6 +75,7 @@ export async function backtestOptimizer(payload:MarketPayload,tickers:string[],s
   }
   if(d%10===0){onProgress?.(d/dates.length);await new Promise<void>(resolve=>setTimeout(resolve,0));}
  }
+ if(decisions>0 && events.length===decisions && events.every(e=>e.status==="Skipped: no active non-zero forecast")) throw Error("No decision had an active non-zero forecast. Check the test dates, forecast horizon and tickers.");
  const rf=new Map(payload.academicFactors?.rows.map(r=>[r.date,r.rf])??[]);
  const calibration=calibrateRisk(riskChecks,dates,prices.map(map=>dates.slice(1).map((date,i)=>map.get(date)!/map.get(dates[i])!-1)),dates.slice(1).map(d=>rf.get(d)));
  onProgress?.(1);return {calibration,dates,curve,dailyReturns:curve.slice(1).map((v,i)=>v/curve[i]-1),events,decisions,totalCosts,holdingChecksSkipped,weightsHistory};

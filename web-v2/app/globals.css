@@ -1001,3 +1001,11 @@
 .optimizer-backtest>.panel-title span{font-size:12px;color:var(--muted)}
 #optimizer-shared-setup{scroll-margin-top:18px}
 @media(max-width:650px){.optimizer-backtest>.panel-title{align-items:flex-start;flex-wrap:wrap;gap:12px}.historical-test-actions{width:100%}}
+
+.csv-kind-selector,.forecast-source-controls,.csv-import-status { display:flex; align-items:center; flex-wrap:wrap; gap:.5rem; }
+.csv-kind-selector { margin: .8rem 0; }
+.csv-kind-selector button,.forecast-source-controls button,.csv-upload-hint button { border:1px solid var(--border,#454641); border-radius:4px; background:transparent; color:inherit; padding:.36rem .65rem; cursor:pointer; }
+.csv-kind-selector button[aria-pressed="true"] { background:#363730; color:#fff; border-color:#888878; }
+.csv-upload-dialog pre { overflow-x:auto; }
+.csv-import-status { justify-content:space-between; padding:.4rem 1rem; color:#cecec3; font-size:.85rem; }
+.csv-import-status button { background:transparent; color:inherit; border:0; cursor:pointer; }

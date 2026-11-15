@@ -19,7 +19,7 @@ test("legacy proxy model remains available; published attribution is labelled di
 
 test("factor taxonomy broadens only with defensible ETF proxies", async () => {
   const analytics = await readFile(new URL("../lib/analytics.ts", import.meta.url), "utf8");
-  const route = await readFile(new URL("../app/api/market-data/route.ts", import.meta.url), "utf8");
+  const route = await readFile(new URL("../lib/market-data-request.ts", import.meta.url), "utf8");
 
   assert.match(analytics, /Dividend yield/);
   assert.match(analytics, /Communication services/);

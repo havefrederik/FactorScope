@@ -13,3 +13,12 @@ export function validateMarketTickers(input: unknown): string[] {
   if (tickers.length > MAX_MARKET_TICKERS) throw new Error(`Request up to ${MAX_MARKET_TICKERS} unique stock tickers. Received ${tickers.length}.`);
   return tickers;
 }
+
+export const FACTOR_SYMBOLS = [
+  "SPY", "IWM", "IWD", "IWF", "MTUM", "QUAL", "USMV", "VYM", "IJH", "COWZ",
+  "XLK", "XLF", "XLE", "XLV", "XLC", "XLY", "XLP", "XLI", "XLB", "XLRE", "XLU",
+];
+
+export function priceUniverse(holdings: string[]) {
+  return [...new Set([...holdings.filter(t => t && t !== "CASH"), ...FACTOR_SYMBOLS, "BIL"])];
+}

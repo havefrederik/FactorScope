@@ -25,3 +25,9 @@ test("oversized requests are rejected before making any provider calls",async()=
   assert.equal(response.status,400);assert.match((await response.json()).error,/Received 61/);
   assert.equal(chartCalls.length,count);
 });
+
+test("provider fetches cover only tickers without an uploaded series",async()=>{
+ const response=await POST(new Request("https://example.test/api/market-data",{method:"POST",body:JSON.stringify({tickers:["PRIVATE","MISSING"],supplied:["PRIVATE","SPY"]})}));
+ assert.equal(response.status,200);const data=await response.json();assert.deepEqual(data.missingHoldings,[]);
+ assert.ok(data.series.MISSING);assert.equal(data.series.PRIVATE,undefined);assert.equal(data.series.SPY,undefined);assert.ok(!chartCalls.includes("PRIVATE"));
+});

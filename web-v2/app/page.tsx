@@ -8,6 +8,8 @@ import ScenarioWorkspace from "./scenario-workspace";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import StatisticalModel from "./statistical-model";
 import AboutMethodology from "./about-methodology";
+import { parseForecastBook, parseHoldingsBundle, parsePrices, withUploadedPrices, type ForecastBook, type UploadedPrices, type CsvKind } from "@/lib/portfolio-imports";
+import { priceUniverse, normalizeYahooSymbol } from "@/lib/market-data-request";
 import CsvUploadDialog from "./csv-upload-dialog";
 import {aiPortfolioSeed, AI_PORTFOLIO_DATE} from "@/lib/ai-portfolio";
 import CovarianceForecastView from "./covariance-forecast";
@@ -22,7 +24,6 @@ import type { ConstructionSnapshot } from "@/lib/portfolio-construction";
 import PortfolioOptimizer from "./portfolio-optimizer";
 import HedgeSupport from "./hedge-support";
 import type {RiskEstimator} from "@/lib/shrinkage-risk";
-import { parseHoldingsCsv } from "@/lib/holdings-input";
 import StrategyWorkspace, { type StrategySettings, type StrategyWorkspaceProps } from "./strategy-workspace";
 import PortfolioComparisonWorkspace from "./portfolio-comparison";
 import FactorExposureChart from "./factor-exposure-chart";
@@ -410,6 +411,16 @@ export default function Home() {
   const [csvGuideNavigation, setCsvGuideNavigation] = useState(0);
   useEffect(()=>{const open=()=>{setView("Methodology");requestAnimationFrame(()=>document.getElementById("about-models")?.scrollIntoView({block:"start"}));};window.addEventListener("factorscope-open-about",open);return()=>window.removeEventListener("factorscope-open-about",open);},[]);
   const [csvUploadOpen, setCsvUploadOpen] = useState(false);
+  const [csvKind,setCsvKind] = useState<CsvKind>("holdings");
+  const [forecastBook,setForecastBook] = useState<ForecastBook|null>(null);
+  const [uploadedPrices,setUploadedPrices] = useState<UploadedPrices|null>(null);
+  const [importNotice,setImportNotice] = useState("");
+  function openUpload(kind:CsvKind) { setCsvKind(kind); setCsvUploadOpen(true); }
+  function removeImport(kind:"prices"|"forecasts") {
+    if (kind==="prices") setUploadedPrices(null); else setForecastBook(null);
+    setOptimizerProposal(null);
+    setImportNotice(kind==="prices"?"Uploaded prices removed. Using Yahoo prices.":"Return forecasts removed.");
+  }
   function openCsvGuide() {
     window.history.replaceState(null, "", "#about-csv");
     setView("Methodology");
@@ -529,13 +540,16 @@ export default function Home() {
     if(isArchivedPortfolio){setMarketData(null);setDataError(null);setLoading(false);return;}
     setLoading(true); setMarketData(null); setDataError(null); setDataErrorKind("connection");
     try {
+      const requested = tickerKey.split("|").filter(Boolean);
+      const universe = priceUniverse(requested);
+      const supplied = universe.filter(t => uploadedPrices?.series[normalizeYahooSymbol(t)]);
       const [response,factorResponse] = await Promise.all([
-        fetch("/api/market-data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tickers: tickerKey.split("|").filter(Boolean), years: isExample ? 5 : 10 }) }),
+        fetch("/api/market-data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tickers: requested, supplied, years: isExample ? 5 : 10 }) }),
         fetch("/api/academic-factors")
       ]);
       const [rawPayload,published] = await Promise.all([response.json(),factorResponse.json()]);
       if(!factorResponse.ok)throw Error(published.error||"Published factors are unavailable. Retry to restore the common analysis period.");
-      const payload = rawPayload.error?rawPayload as MarketPayload:withPublishedFactors(rawPayload,published);
+      const payload = rawPayload.error?rawPayload as MarketPayload:withPublishedFactors(withUploadedPrices(rawPayload,uploadedPrices,universe),published);
       if(request!==marketRequest.current)return;
       if (!response.ok || payload.error) {
         setDataErrorKind(response.status >= 400 && response.status < 500 && response.status !== 429 ? "request" : "connection");
@@ -553,7 +567,7 @@ export default function Home() {
       if(request!==marketRequest.current)return;
       setDataError(error instanceof Error ? error.message : "Unable to load Yahoo Finance data.");
     } finally { if(request===marketRequest.current)setLoading(false); }
-  }, [tickerKey,isArchivedPortfolio,isExample]);
+  }, [tickerKey,isArchivedPortfolio,isExample,uploadedPrices]);
 
   // Synchronize the current ticker set with the external market-data service.
   // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -594,8 +608,33 @@ export default function Home() {
   function loadDemo(key:DemoKey){const url=new URL(window.location.href);url.searchParams.set("portfolio",key);window.history.replaceState(null,"",url);const next=key==="ai"?aiPortfolioSeed:key==="published-market-neutral"?publishedMarketNeutralSeed:key==="published-dow"?publishedDowSeed:key==="example"?exampleSeed:equitySeed;setDemoKey(key);setHoldings(next.map(item=>({...item})));setBaselineHoldings(next.map(item=>({...item})));setPortfolioSource("demo");setPortfolioName(key==="ai"?"AI Theme Portfolio":key==="published-market-neutral"?"AQR Equity Market Neutral":key==="published-dow"?"Published Dow Strategy":key==="example"?"US Equity Portfolio":"US Equity Portfolio");setPortfolioError(null);setSelectedTicker(null);setEditing(false)}
   useEffect(()=>{if(new URLSearchParams(window.location.search).get("portfolio")==="example")loadDemo("example")},[]);
   function resetDemo(){loadDemo(demoKey)}
-  async function upload(file: File) {
-    const portfolio = parseHoldingsCsv(await file.text()).map(h => ({...h, beta: h.ticker === "CASH" ? 0 : 1, vol: 25, risk: 0}));
+  async function upload(file: File, kind: CsvKind) {
+    if (file.size > 25_000_000) throw Error("Use a CSV under 25 MB.");
+    const text = await file.text();
+    const fingerprint=async()=>{
+      const hash=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(text));
+      return Array.from(new Uint8Array(hash),x=>x.toString(16).padStart(2,"0")).join("");
+    };
+    if (kind==="forecasts") {
+      const id=await fingerprint();
+      const book = parseForecastBook(text,file.name,id);
+      setForecastBook(book);
+      setOptimizerProposal(null);
+      setImportNotice(`${book.count} dated forecasts loaded. Select Maximum expected Sharpe in Optimizer to use them.`);
+      return;
+    }
+    if (kind==="prices") {
+      const data = parsePrices(text,file.name);
+      setUploadedPrices(data);
+      setOptimizerProposal(null);
+      setImportNotice(`Adjusted prices loaded for ${Object.keys(data.series).length} tickers. Other tickers use Yahoo.`);
+      return;
+    }
+    const bundle=parseHoldingsBundle(text,file.name,await fingerprint());
+    if (bundle.book) setForecastBook(bundle.book);
+    setImportNotice(bundle.book?`Holdings and ${bundle.book.count} dated forecasts loaded.`:"");
+    setOptimizerProposal(null);
+    const portfolio = bundle.holdings.map(h => ({...h, beta: h.ticker === "CASH" ? 0 : 1, vol: 25, risk: 0}));
     setHoldings(portfolio);
     setBaselineHoldings(portfolio.map(item => ({...item})));
     setEditing(true);
@@ -640,7 +679,7 @@ export default function Home() {
           <button disabled={isArchivedPortfolio} onClick={()=>setView("Compare")} aria-current={primarySection==="Strategy Lab"?"page":undefined} className={primarySection==="Strategy Lab"?"active":""}>Strategy Lab</button>
           <button onClick={()=>setView("Methodology")} aria-current={primarySection==="About"?"page":undefined} className={primarySection==="About"?"active":""}>About</button>
         </nav>
-        <div className="top-meta">{isArchivedPortfolio?<>Published archive · through 2026-04-27 <b>•</b> Paper simulation</>:<><span className={`live-dot ${dataError ? "error-dot" : missingHoldings.length ? "warning-dot" : ""}`} /> {loading ? "Loading Yahoo data" : dataError ? dataErrorKind === "request" ? "Invalid data request" : "Data connection issue" : missingHoldings.length ? `${missingHoldings.length} ticker${missingHoldings.length>1?"s":""} unavailable` : `Yahoo prices + French factors · through ${marketData?.asOf ?? "latest"}`} <b>•</b> Daily adjusted</>} <div className="avatar">FS</div></div>
+        <div className="top-meta">{isArchivedPortfolio?<>Published archive · through 2026-04-27 <b>•</b> Paper simulation</>:<><span className={`live-dot ${dataError ? "error-dot" : missingHoldings.length ? "warning-dot" : ""}`} /> {loading ? "Loading Yahoo data" : dataError ? dataErrorKind === "request" ? "Invalid data request" : "Data connection issue" : missingHoldings.length ? `${missingHoldings.length} ticker${missingHoldings.length>1?"s":""} unavailable` : `${uploadedPrices && Object.values(marketData?.series??{}).some(s=>s.exchange==="Uploaded") ? "Custom prices" : "Yahoo prices"} + French factors · through ${marketData?.asOf ?? "latest"}`} <b>•</b> Daily adjusted</>} <div className="avatar">FS</div></div>
       </header>
 
       <section className="portfolio-toolbar" aria-label="Current portfolio">
@@ -651,12 +690,13 @@ export default function Home() {
         <div className="portfolio-tools">
           {primarySection==="Strategy Lab"&&<button onClick={()=>downloadHoldings(overviewData,holdings,portfolioName,analysisEnd)}>Export holdings ↓</button>}
           {!isPublishedFund&&<button onClick={()=>{if(isReadOnlyPortfolio){setHoldings(holdings.map(h=>({...h})));setBaselineHoldings(holdings.map(h=>({...h})));setPortfolioSource("uploaded");setPortfolioName("My portfolio");setView("Optimizer");setEditing(true);}else setEditing(current=>!current);}}>{isReadOnlyPortfolio?"Customize portfolio":editing?"Close editor":"Edit portfolio"}</button>}
-          <button type="button" onClick={()=>setCsvUploadOpen(true)}><Icon name="upload"/>Upload CSV</button>
+          <button type="button" onClick={()=>openUpload("holdings")}><Icon name="upload"/>Upload CSV</button>
           <button onClick={resetDemo}>Reset demo</button>
         </div>
       </section>
 
-      <CsvUploadDialog open={csvUploadOpen} onClose={()=>setCsvUploadOpen(false)} onGuide={openCsvGuide} onUpload={upload}/>
+      {importNotice&&<div className="csv-import-status" role="status">{importNotice}<button aria-label="Dismiss upload status" onClick={()=>setImportNotice("")}>×</button></div>}
+      <CsvUploadDialog initialKind={csvKind} loaded={{forecasts:forecastBook?.name,prices:uploadedPrices?.name}} onRemove={removeImport} open={csvUploadOpen} onClose={()=>setCsvUploadOpen(false)} onGuide={openCsvGuide} onUpload={upload}/>
 
       <section className="workspace">
         {primarySection === "Portfolio & Risk" && <div className="section-tabs" role="tablist" aria-label="Portfolio and risk views">
@@ -695,7 +735,7 @@ export default function Home() {
         {view === "Strategy Analysis" && marketData && (isPublishedFund?<section className="data-state"><div><strong>The fund’s allocation is managed by AQR</strong><p>Daily underlying weights are not available here. Risk Targeting controls cannot change the fund’s historical trades. Choose the US Equity Portfolio to construct and inspect a dynamic allocation.</p></div></section>:hasShort?<section className="data-state"><div><strong>Risk Targeting is long-only</strong><p>Switch to the US Equity Portfolio demo or remove short positions. Portfolios with short positions can still be analyzed in Portfolio &amp; Risk, Compare and Scenarios.</p></div></section>:<StrategyAnalysis onHistoricalTest={()=>{setHistoryTestOpen(true);setView("Optimizer");}} strategy={strategyAnalytics} snapshot={riskTargetSnapshot} isUpdating={strategyBacktestUpdating} total={total} frequency={strategyFrequency} setFrequency={setStrategyFrequency} targetVolatility={strategyTargetVolatility} setTargetVolatility={setStrategyTargetVolatility} targetBeta={strategyTargetBeta} setTargetBeta={setStrategyTargetBeta} maxPosition={strategyMaxPosition} setMaxPosition={setStrategyMaxPosition} applied={deferredStrategyConfig} hasPendingChanges={strategyHasPendingChanges} onRunBacktest={()=>setAppliedStrategyConfig({frequency:strategyFrequency,targetVolatility:strategyTargetVolatility,targetBeta:strategyTargetBeta,maxPosition:strategyMaxPosition})} onResetDraft={()=>{setStrategyFrequency(appliedStrategyConfig.frequency);setStrategyTargetVolatility(appliedStrategyConfig.targetVolatility);setStrategyTargetBeta(appliedStrategyConfig.targetBeta);setStrategyMaxPosition(appliedStrategyConfig.maxPosition)}} onSelectTicker={setSelectedTicker} payload={marketData} startDate={analytics?.startDate??analysisStart} endDate={analytics?.endDate??analysisEnd} />)}
         {view === "Security Analysis" && analytics && <SecurityAnalysisWorkspace holdings={holdings} selectedTicker={selectedTicker} onSelectTicker={setSelectedTicker} security={securityAnalytics} portfolio={analytics} total={total} />}
         {view === "Hedge Support" && marketData && <HedgeSupport payload={marketData} holdings={holdings} history={overviewData} asOf={analysisEnd} onMethodology={()=>{setView("Methodology");setTimeout(()=>document.getElementById("about-hedges")?.scrollIntoView({behavior:"smooth"}),0);}}/>}
-        {optimizerWorkspaceActive && marketData && <div hidden={view!=="Optimizer"}><PortfolioOptimizer historyTestOpen={historyTestOpen} onHistoryTestOpenChange={setHistoryTestOpen} history={overviewData} referenceHistory={overviewData?.analytics??analytics} key={`${optimizerBaseForecast?.asOf}-${holdings.map(h=>`${h.ticker}:${h.value}`).join("|")}`} holdings={holdings} payload={marketData} forecast={optimizerBaseForecast} riskEstimator={optimizerRiskEstimator} setRiskEstimator={setOptimizerRiskEstimator} onAsOfChange={setAnalysisEnd} onSelectTicker={setSelectedTicker} onApply={(weights,snapshot)=>{setOptimizerProposal({weights,snapshot,signature:holdings.map(h=>`${h.ticker}:${h.value}`).join("|"),id:Date.now()});setView("Compare");}}/></div>}
+        {optimizerWorkspaceActive && marketData && <div hidden={view!=="Optimizer"}><PortfolioOptimizer forecastBook={forecastBook} onUploadForecasts={()=>openUpload("forecasts")} historyTestOpen={historyTestOpen} onHistoryTestOpenChange={setHistoryTestOpen} history={overviewData} referenceHistory={overviewData?.analytics??analytics} key={`${optimizerBaseForecast?.asOf}-${holdings.map(h=>`${h.ticker}:${h.value}`).join("|")}`} holdings={holdings} payload={marketData} forecast={optimizerBaseForecast} riskEstimator={optimizerRiskEstimator} setRiskEstimator={setOptimizerRiskEstimator} onAsOfChange={setAnalysisEnd} onSelectTicker={setSelectedTicker} onApply={(weights,snapshot)=>{setOptimizerProposal({weights,snapshot,signature:holdings.map(h=>`${h.ticker}:${h.value}`).join("|"),id:Date.now()});setView("Compare");}}/></div>}
         {isStatisticalView && <StatisticalModel maxDate={marketData?.asOf??""} historicalPortfolio={isExample?exampleData:null} holdings={holdings} holdingsDate={isAI?AI_PORTFOLIO_DATE:isExample?exampleSnapshot?.date??"":analysisEnd} portfolioName={portfolioName} isAI={isAI}/> }
         {view === "Risk Analysis" && !isStatisticalView && analytics && marketData && !(isPublishedFund&&(riskTab==="Risk & Correlation Forecast"||riskTab==="Correlations")) && <RiskWorkspace tab={riskTab} model={factorModel} total={total} holdings={holdings} analytics={analytics} payload={marketData} forecast={covarianceForecast} onSelectTicker={setSelectedTicker} />}
         {view === "Risk Analysis" && isPublishedFund && (riskTab==="Risk & Correlation Forecast"||riskTab==="Correlations") && <section className="data-state"><div><strong>Underlying holdings history is unavailable</strong><p>The published demo provides the fund’s return series. A cross-security covariance or correlation matrix requires the underlying security universe and dated positions. Use the US Equity Portfolio or an uploaded portfolio for these tools.</p></div></section>}

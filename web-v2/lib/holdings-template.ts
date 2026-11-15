@@ -6,10 +6,14 @@ CASH,20000,Cash,Cash
 `;
 
 export function downloadHoldingsTemplate() {
-  const url = URL.createObjectURL(new Blob([HOLDINGS_CSV_TEMPLATE], { type: "text/csv;charset=utf-8" }));
+  downloadCsvTemplate("holdings-example", HOLDINGS_CSV_TEMPLATE);
+}
+
+export function downloadCsvTemplate(name:string, contents:string) {
+  const url = URL.createObjectURL(new Blob([contents], { type: "text/csv;charset=utf-8" }));
   const link = document.createElement("a");
   link.href = url;
-  link.download = "factorscope-holdings-example.csv";
+  link.download = `factorscope-${name}.csv`;
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

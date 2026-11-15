@@ -33,6 +33,8 @@ test('One optimizer exposes a dated proposal and a collapsible historical test w
     assert.match(hindsight,/Selected-date preview · rebuilt at each historical decision/);
     assert.match(hindsight,/<option value="Maximum expected Sharpe" disabled="">/);
     assert.doesNotMatch(optimizer,/<option value="Maximum expected Sharpe" disabled="">/);
+    const withBook=renderToStaticMarkup(React.createElement(Optimizer,{...props,historyTestOpen:true,forecastBook:{id:"csv",name:"forecasts.csv",count:1,byHorizon:new Map([[5,new Map()]])}}));
+    assert.doesNotMatch(withBook,/<option value="Maximum expected Sharpe" disabled="">/);
     assert.match(optimizer,/Optimize as of/);
     assert.match(hindsight,/Bounds apply to each proposed allocation/);
     assert.doesNotMatch(hindsight,/<th>Proposed<\/th>|<th>Trade value<\/th>/);

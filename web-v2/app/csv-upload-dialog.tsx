@@ -1,14 +1,25 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { downloadHoldingsTemplate, HOLDINGS_CSV_TEMPLATE } from "@/lib/holdings-template";
+import { forecastTemplate, pricesTemplate, type CsvKind } from "@/lib/portfolio-imports";
+import { downloadCsvTemplate, HOLDINGS_CSV_TEMPLATE } from "@/lib/holdings-template";
 
-export default function CsvUploadDialog({ open, onClose, onGuide, onUpload }: {
+export default function CsvUploadDialog({ open, onClose, onGuide, onUpload, initialKind, loaded, onRemove }: {
   open: boolean;
   onClose: () => void;
   onGuide: () => void;
-  onUpload: (file: File) => Promise<void>;
+  initialKind: CsvKind;
+  loaded: Partial<Record<CsvKind,string>>;
+  onRemove: (kind: "forecasts" | "prices") => void;
+  onUpload: (file: File, kind: CsvKind) => Promise<void>;
 }) {
+  const [kind,setKind] = useState<CsvKind>(initialKind);
+  const formats = {
+    holdings: { label:"Holdings", description:"One row per position, with its market value in US dollars.", template:HOLDINGS_CSV_TEMPLATE },
+    forecasts: { label:"Return forecasts", description:"One row per ticker, availability date and forecast horizon. Enter 8 for an 8% annual excess return.", template:forecastTemplate },
+    prices: { label:"Adjusted prices", description:"Daily USD closes adjusted for splits and dividends. Each supplied ticker uses its complete uploaded series.", template:pricesTemplate },
+  };
+  const format = formats[kind];
   const dialog = useRef<HTMLDialogElement>(null);
   const input = useRef<HTMLInputElement>(null);
   const [error, setError] = useState("");
@@ -17,18 +28,19 @@ export default function CsvUploadDialog({ open, onClose, onGuide, onUpload }: {
   useEffect(() => {
     if (open) {
       setError("");
+      setKind(initialKind);
       dialog.current?.showModal();
     } else {
       dialog.current?.close();
     }
-  }, [open]);
+  }, [open,initialKind]);
 
   async function readFile(file?: File) {
     if (!file) return;
     setError("");
     setReading(true);
     try {
-      await onUpload(file);
+      await onUpload(file,kind);
       onClose();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Unable to read this file. Please choose a CSV file.");
@@ -40,18 +52,15 @@ export default function CsvUploadDialog({ open, onClose, onGuide, onUpload }: {
   return <dialog ref={dialog} className="csv-upload-dialog" aria-labelledby="csv-upload-title" aria-describedby="csv-upload-description"
     onCancel={event => { event.preventDefault(); if (!reading) onClose(); }}>
     <header className="csv-upload-heading">
-      <div><span className="guide-eyebrow">YOUR PORTFOLIO</span><h2 id="csv-upload-title">Upload a portfolio</h2></div>
+      <div><h2 id="csv-upload-title">Upload CSV</h2></div>
       <button type="button" className="csv-upload-close" aria-label="Close CSV upload" disabled={reading} onClick={onClose}>×</button>
     </header>
-    <p id="csv-upload-description">Choose a CSV with one row per position and its market value in US dollars.</p>
-    <div className="csv-upload-columns">
-      <p><strong>Required</strong><code>ticker</code><code>market_value</code></p>
-      <p><strong>Optional</strong><code>name</code><code>sector</code></p>
-    </div>
-    <pre aria-label="Example holdings CSV"><code>{HOLDINGS_CSV_TEMPLATE}</code></pre>
-    <p className="csv-upload-hint">Use dollar values, not shares or percentages. Include a header row, separate columns with commas, and use a decimal point. Use <code>CASH</code> for cash.</p>
+    <div className="csv-kind-selector" role="group" aria-label="CSV type">{(Object.keys(formats) as CsvKind[]).map(k=><button key={k} type="button" disabled={reading} aria-pressed={kind===k} onClick={()=>{setKind(k);setError("");}}>{formats[k].label}</button>)}</div>
+    <p id="csv-upload-description">{format.description}</p>
+    <pre aria-label={format.label+" CSV example"}><code>{format.template}</code></pre>
+    {kind!=="holdings" && loaded[kind] && <p className="csv-upload-hint">Loaded · {loaded[kind]} <button disabled={reading} onClick={()=>onRemove(kind)}>Remove</button></p>}
     <div className="csv-upload-help">
-      <button type="button" onClick={downloadHoldingsTemplate}>Download example CSV ↓</button>
+      <button type="button" onClick={()=>downloadCsvTemplate(kind+"-example",format.template)}>Download template ↓</button>
       <a href="#about-csv" onClick={event => {
         if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
         event.preventDefault();
@@ -64,7 +73,7 @@ export default function CsvUploadDialog({ open, onClose, onGuide, onUpload }: {
     <footer className="csv-upload-actions">
       <button type="button" disabled={reading} onClick={onClose}>Cancel</button>
       <button type="button" className="csv-choose-file" autoFocus disabled={reading} onClick={() => input.current?.click()}>{reading ? "Reading file…" : "Choose file"}</button>
-      <input ref={input} type="file" accept=".csv,text/csv" hidden aria-label="Portfolio CSV file" onChange={event => {
+      <input ref={input} type="file" accept=".csv,text/csv" hidden aria-label={format.label+" CSV file"} onChange={event => {
         const file = event.currentTarget.files?.[0];
         event.currentTarget.value = "";
         void readFile(file);

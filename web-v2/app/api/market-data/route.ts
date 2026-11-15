@@ -1,12 +1,9 @@
 import YahooFinance from "yahoo-finance2";
-import { normalizeYahooSymbol, validateMarketTickers } from "../../../lib/market-data-request.ts";
+import { normalizeYahooSymbol, validateMarketTickers, FACTOR_SYMBOLS, priceUniverse } from "../../../lib/market-data-request.ts";
 
 const yahooFinance = new YahooFinance();
 const cache = new Map<string, { expires: number; value: SymbolSeries }>();
-const FACTOR_SYMBOLS = [
-  "SPY", "IWM", "IWD", "IWF", "MTUM", "QUAL", "USMV", "VYM", "IJH", "COWZ",
-  "XLK", "XLF", "XLE", "XLV", "XLC", "XLY", "XLP", "XLI", "XLB", "XLRE", "XLU",
-];
+
 
 type PricePoint = { date: string; close: number };
 type SymbolSeries = {
@@ -59,12 +56,13 @@ async function loadSymbol(requested: string, period1: Date, period2: Date): Prom
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json() as { tickers?: string[]; years?: number };
+    const body = await request.json() as { tickers?: string[]; years?: number; supplied?: string[] };
     let holdings: string[];
     try { holdings = validateMarketTickers(body.tickers); }
     catch (error) { return Response.json({ error: error instanceof Error ? error.message : "Invalid data request." }, { status: 400 }); }
 
-    const unique = [...new Set([...holdings, ...FACTOR_SYMBOLS, "BIL"])];
+    const supplied = new Set(Array.isArray(body.supplied) ? body.supplied : []);
+    const unique = priceUniverse(holdings).filter(ticker => !supplied.has(ticker));
 
     const years = Math.max(3, Math.min(10, Number(body.years) || 3));
     const period2 = new Date();
@@ -81,7 +79,7 @@ export async function POST(request: Request) {
       else errors.push({ ticker, message: result.reason instanceof Error ? result.reason.message : "Price history unavailable" });
     });
 
-    const missingHoldings = holdings.filter((ticker) => !series[ticker]);
+    const missingHoldings = holdings.filter((ticker) => !series[ticker] && !supplied.has(ticker));
     if (missingHoldings.length === holdings.length) {
       return Response.json({ error: "Yahoo Finance did not return data for the portfolio.", errors }, { status: 502 });
     }
@@ -100,7 +98,7 @@ export async function POST(request: Request) {
       series,
       errors,
       missingHoldings,
-    }, { headers: { "Cache-Control": "public, max-age=900, s-maxage=1800" } });
+    }, { headers: { "Cache-Control": supplied.size ? "no-store" : "public, max-age=900, s-maxage=1800" } });
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "Unable to load market data." }, { status: 500 });
   }

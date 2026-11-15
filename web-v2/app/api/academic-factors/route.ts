@@ -1,5 +1,5 @@
 import {inflateRawSync} from 'node:zlib';
-import {combineFrench,type AcademicFactors} from '../../../lib/academic-factors.ts';
+import {combineFrench,validateAcademicFactors,type AcademicFactors} from '../../../lib/academic-factors.ts';
 let cached:AcademicFactors|null=null,expires=0;
 /** Read a small, single-CSV ZIP using its central directory; no filesystem extraction. */
 function csvInZip(buffer:ArrayBuffer){
@@ -12,13 +12,39 @@ function csvInZip(buffer:ArrayBuffer){
   const data=bytes.slice(start,start+size);return new TextDecoder().decode(method===8?inflateRawSync(data,{maxOutputLength:10_000_000}):method===0?data:(()=>{throw Error('Unsupported factor archive')})());
  }throw Error('CSV missing from factor archive.');
 }
-export async function GET(){
- try{
-  if(!cached||Date.now()>expires){
-   const base='https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/';
-   const texts=await Promise.all(['F-F_Research_Data_5_Factors_2x3_daily_CSV.zip','F-F_Momentum_Factor_daily_CSV.zip'].map(async file=>{const r=await fetch(base+file,{signal:AbortSignal.timeout(20000)});if(!r.ok)throw Error('French data download unavailable.');return csvInZip(await r.arrayBuffer())}));
-   cached=combineFrench(texts[0],texts[1]);expires=Date.now()+6*3600_000;
+async function loadPublishedFactors() {
+  const base = 'https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/';
+  try {
+    const texts = await Promise.all(['F-F_Research_Data_5_Factors_2x3_daily_CSV.zip', 'F-F_Momentum_Factor_daily_CSV.zip'].map(async file => {
+      const response = await fetch(base + file, {signal: AbortSignal.timeout(8000)});
+      if (!response.ok) throw Error('French archive unavailable.');
+      return csvInZip(await response.arrayBuffer());
+    }));
+    return combineFrench(texts[0], texts[1]);
+  } catch {
+    // The independent FactorScope data service reads the same two French archives.
+    const response = await fetch('https://factorscope-v2.frede2200.chatgpt.site/api/academic-factors', {signal: AbortSignal.timeout(10000)});
+    if (!response.ok) throw Error('Factor service unavailable.');
+    const data: AcademicFactors = await response.json();
+    validateAcademicFactors(data);
+    const expected = ['Market − RF', 'Size (SMB)', 'Value (HML)', 'Profitability (RMW)', 'Investment (CMA)', 'Momentum (Mom)'];
+    if (data.names.some((name, i) => name !== expected[i])) throw Error('Unexpected factor ordering.');
+    return data;
   }
-  return Response.json(cached,{headers:{'Cache-Control':'public, max-age=3600'}});
- }catch{return Response.json({error:'French factor data are temporarily unavailable. No ETF substitute has been used.'},{status:502});}
+}
+
+export async function GET() {
+  if (!cached || Date.now() > expires) {
+    try {
+      const latest = await loadPublishedFactors();
+      if (!cached || latest.through >= cached.through) cached = latest;
+      expires = Date.now() + 6 * 3600_000;
+    } catch {
+      if (!cached) return Response.json({error:'French factor data are temporarily unavailable. No ETF substitute has been used.'}, {status:502});
+      // Keep the verified dated sample and retry soon.
+      expires = Date.now() + 60_000;
+    }
+  }
+  const maxAge = Math.min(3600, Math.max(0, Math.floor((expires - Date.now()) / 1000)));
+  return Response.json(cached, {headers:{'Cache-Control':`public, max-age=${maxAge}`}});
 }

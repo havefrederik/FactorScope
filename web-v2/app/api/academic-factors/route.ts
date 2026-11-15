@@ -33,14 +33,20 @@ async function loadPublishedFactors() {
   }
 }
 
-export async function GET() {
+export async function GET(request?: Request) {
   if (!cached || Date.now() > expires) {
     try {
       const latest = await loadPublishedFactors();
       if (!cached || latest.through >= cached.through) cached = latest;
       expires = Date.now() + 6 * 3600_000;
     } catch {
-      if (!cached) return Response.json({error:'French factor data are temporarily unavailable. No ETF substitute has been used.'}, {status:502});
+      if (!cached) {
+        // Let the visitor fetch the public data directly if both server-side connections fail.
+        if (request && new URL(request.url).origin === 'https://factor-scope.vercel.app') {
+          return Response.redirect('https://factorscope-v2.frede2200.chatgpt.site/api/academic-factors', 307);
+        }
+        return Response.json({error:'French factor data are temporarily unavailable. No ETF substitute has been used.'}, {status:502});
+      }
       // Keep the verified dated sample and retry soon.
       expires = Date.now() + 60_000;
     }

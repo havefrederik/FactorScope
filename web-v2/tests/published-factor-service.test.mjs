@@ -36,3 +36,13 @@ test('does not accept missing, reordered, or malformed factor data', async t => 
     fetch.mock.restore();
   }
 });
+
+test('the production app can retrieve the same dated feed directly during a server outage', async t => {
+  const { GET } = await import('../app/api/academic-factors/route.ts?outage');
+  t.mock.method(globalThis, 'fetch', async () => { throw Error('Service unreachable.'); });
+  const response = await GET(new Request('https://factor-scope.vercel.app/api/academic-factors'));
+  assert.equal(response.status, 307);
+  assert.equal(response.headers.get('location'), service);
+  const mirror = await GET(new Request(service));
+  assert.equal(mirror.status, 502);
+});

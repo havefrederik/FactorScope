@@ -5,7 +5,7 @@ import { buildAnalytics, buildFactorModel, type MarketPayload, type RiskTargetSn
 
 export type StrategySettings = { frequency: StrategyRebalanceFrequency; targetVolatility: number; targetBeta: number; maxPosition: number };
 export type StrategyWorkspaceProps = {
-  onHindsight?: () => void;
+  onHistoricalTest?: () => void;
   strategy: StrategyBacktestAnalytics | null;
   snapshot: RiskTargetSnapshot | null;
   isUpdating: boolean;
@@ -73,7 +73,7 @@ export default function StrategyWorkspace(props: StrategyWorkspaceProps & {
   const years = (Date.parse(strategy.endDate) - Date.parse(strategy.startDate)) / (365.25 * 86400000);
   const cagr = years > 0 && strategy.totalReturn > -1 ? (1 + strategy.totalReturn) ** (1 / years) - 1 : null;
   return <section className="lab-workspace">
-    <header className="panel strategy-purpose"><div><h2>Risk Targeting</h2><p>A fixed CM-IEWMA rule: allocate risk across long positions, then scale stocks and cash to stay within your ceilings.</p><small>Weekly or monthly rebalancing · no shorts or leverage · separate from your Optimizer setup</small></div>{props.onHindsight&&<div className="strategy-purpose-actions"><button onClick={props.onHindsight}>Test other models in Hindsight Lab →</button><a href="#about-risk-targeting" onClick={()=>window.dispatchEvent(new CustomEvent("factorscope-open-about"))}>Methodology ↗</a></div>}</header>
+    <header className="panel strategy-purpose"><div><h2>Risk Targeting</h2><p>A fixed CM-IEWMA rule: allocate risk across long positions, then scale stocks and cash to stay within your ceilings.</p><small>Weekly or monthly rebalancing · no shorts or leverage · separate from your Optimizer setup</small></div>{props.onHistoricalTest&&<div className="strategy-purpose-actions"><button onClick={props.onHistoricalTest}>Test optimizer rules through history →</button><a href="#about-risk-targeting" onClick={()=>window.dispatchEvent(new CustomEvent("factorscope-open-about"))}>Methodology ↗</a></div>}</header>
     <div className="lab-construction">
       <aside className="panel lab-settings">
         <header className="panel-title"><h3>Allocation constraints</h3><span>Preview updates immediately</span></header>

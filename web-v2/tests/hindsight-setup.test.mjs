@@ -6,7 +6,7 @@ import {build} from 'esbuild';
 import React from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
 
-test('Hindsight exposes the shared model, objective and constraints without one-date proposal controls',async()=>{
+test('One optimizer exposes a dated proposal and a collapsible historical test with the same setup',async()=>{
   const directory=await mkdtemp(new URL('../.hindsight-render-',import.meta.url));
   try{
     const outfile=`${directory}/optimizer.mjs`;
@@ -18,18 +18,22 @@ test('Hindsight exposes the shared model, objective and constraints without one-
     const payload={asOf:dates.at(-1),series};
     const forecast={asOf:payload.asOf,tickers,covarianceMatrix:[[.04,.01],[.01,.05]],portfolioVolatility:.16,observations:252};
     const noop=()=>{};
-    const props={payload,forecast,holdings:tickers.map(ticker=>({ticker,name:ticker,value:50})),riskEstimator:'Ledoit–Wolf',onApply:noop,onSelectTicker:noop,onAsOfChange:noop,setRiskEstimator:noop,onOpenHindsight:noop};
-    const hindsight=renderToStaticMarkup(React.createElement(Optimizer,{...props,mode:'hindsight'}));
-    const optimizer=renderToStaticMarkup(React.createElement(Optimizer,{...props,mode:'optimizer'}));
+    const props={payload,forecast,holdings:tickers.map(ticker=>({ticker,name:ticker,value:50})),riskEstimator:'Ledoit–Wolf',onApply:noop,onSelectTicker:noop,onAsOfChange:noop,setRiskEstimator:noop,onHistoryTestOpenChange:noop};
+    const hindsight=renderToStaticMarkup(React.createElement(Optimizer,{...props,historyTestOpen:true}));
+    const optimizer=renderToStaticMarkup(React.createElement(Optimizer,{...props,historyTestOpen:false}));
     for(const label of ['Optimizer covariance estimator','Ledoit–Wolf shrinkage method','Risk forecast horizon','Optimization objective','Portfolio exposure preset','Optimizer gross exposure limit','Optimizer position cap','Optimizer turnover limit','AAA min weight','Lock AAA weight']){
       for(const html of [hindsight,optimizer])assert.equal(html.split(`aria-label="${label}"`).length-1,1,label);
     }
-    assert.doesNotMatch(hindsight,/Edit model &amp; constraints|Run optimization|Review allocation &amp; risk|Export proposed trades/);
-    assert.match(hindsight,/Run and compare/);
+    assert.doesNotMatch(hindsight,/Hindsight Lab|Export proposed trades/);
+    assert.match(hindsight,/aria-expanded="true" aria-controls="optimizer-history-panel"/);
+    assert.match(optimizer,/id="optimizer-history-panel" class="hindsight-workspace" hidden=""/);
+    assert.match(hindsight,/Optimize as of/);
+    assert.match(optimizer,/Test through history/);
+    assert.match(hindsight,/Run historical test/);
     assert.match(hindsight,/Selected-date preview · rebuilt at each historical decision/);
     assert.match(hindsight,/<option value="Maximum expected Sharpe" disabled="">/);
     assert.doesNotMatch(optimizer,/<option value="Maximum expected Sharpe" disabled="">/);
-    assert.match(optimizer,/Run optimization/);
+    assert.match(optimizer,/Optimize as of/);
     assert.match(hindsight,/Bounds apply to each proposed allocation/);
     assert.doesNotMatch(hindsight,/<th>Proposed<\/th>|<th>Trade value<\/th>/);
   }finally{await rm(directory,{recursive:true,force:true});}

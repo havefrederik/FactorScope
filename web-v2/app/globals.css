@@ -994,3 +994,10 @@
 .optimizer-backtest>.panel-title{padding:12px 14px;min-height:44px;height:auto}
 .optimizer-backtest>.optimizer-factor-note{padding-top:12px}
 @media(max-width:760px){.strategy-purpose{align-items:flex-start;flex-direction:column}.strategy-purpose-actions{flex-direction:row;flex-wrap:wrap;align-items:center;gap:12px}}
+
+/* The historical test is an action within the shared optimizer workspace. */
+.historical-test-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.optimizer-backtest>.panel-title>div:first-child{display:grid;gap:5px}
+.optimizer-backtest>.panel-title span{font-size:12px;color:var(--muted)}
+#optimizer-shared-setup{scroll-margin-top:18px}
+@media(max-width:650px){.optimizer-backtest>.panel-title{align-items:flex-start;flex-wrap:wrap;gap:12px}.historical-test-actions{width:100%}}

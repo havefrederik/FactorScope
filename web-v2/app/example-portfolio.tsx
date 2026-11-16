@@ -3,7 +3,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { buildPortfolioDecomposition, type MarketPayload, type SecurityDecomposition } from "@/lib/analytics";
 import type { ExamplePortfolioResult } from "@/lib/example-portfolio";
 import { buildPortfolioGroups, type PortfolioGrouping } from "@/lib/portfolio-groups";
-import GroupReturnsChart, { groupStyle } from "./group-returns-chart";
+import GroupReturnsChart, { groupStyle, type GroupMeasure } from "./group-returns-chart";
 import PortfolioHoldings from "./portfolio-holdings";
 
 const money=(n:number)=>new Intl.NumberFormat("en-US",{style:"currency",currency:"USD",maximumFractionDigits:0}).format(n);
@@ -13,6 +13,7 @@ export default function ExamplePortfolio({riskSummary,payload,example,sectors,fi
   const decomposition=useMemo(()=>example?buildPortfolioDecomposition(payload,example.analytics):null,[payload,example]);
   const [chartView,setChartView]=useState<"Attribution"|"Returns by group">("Attribution");
   const [grouping,setGrouping]=useState<PortfolioGrouping>("Stocks");
+  const [groupMeasure,setGroupMeasure]=useState<GroupMeasure>("contribution");
   const grouped=useMemo(()=>buildPortfolioGroups(payload,example,sectors,grouping),[payload,example,sectors,grouping]);
   const [selectedGroup,setSelectedGroup]=useState<string|null>(null);
   const index=Math.max(0,selectedDate?example.days.findLastIndex(day=>day.date<=selectedDate):example.days.length-1);
@@ -31,7 +32,18 @@ export default function ExamplePortfolio({riskSummary,payload,example,sectors,fi
           </div>
           <div className={chartView==="Attribution"?"portfolio-chart-content overview-decomposition":"portfolio-chart-content"} role="tabpanel" aria-label={chartView}>
             {chartView==="Attribution"&&(decomposition?renderDecomposition(decomposition):<p className="archive-table-note">Factor history is incomplete for this period. Choose a more recent starting month.</p>)}
-            {chartView==="Returns by group"&&<><div className="holdings-grouping" aria-label="Group chart and holdings">{(["Stocks","Sectors",...(example.days.some(d=>d.values.some(v=>v<0))?["Long / short"]:[])] as PortfolioGrouping[]).map(mode=><button key={mode} className={grouping===mode?"active":""} aria-pressed={grouping===mode} onClick={()=>{setGrouping(mode);setSelectedGroup(null);}}>{mode}</button>)}</div><GroupReturnsChart dates={grouped.dates} groups={grouped.groups} selectedGroup={selectedGroup} onSelectGroup={selectGroup} selectedDate={day.date} onSelectDate={setSelectedDate}/></>}
+            {chartView==="Returns by group" && <>
+              <div className="holdings-grouping group-chart-controls">
+                <div role="group" aria-label="Group chart and holdings">
+                  {(["Stocks","Sectors",...(example.days.some(d=>d.values.some(v=>v<0))?["Long / short"]:[])] as PortfolioGrouping[]).map(mode=><button key={mode} className={grouping===mode?"active":""} aria-pressed={grouping===mode} onClick={()=>{setGrouping(mode);setSelectedGroup(null);}}>{mode}</button>)}
+                </div>
+                <div role="group" aria-label="Return measure">
+                  <button className={groupMeasure==="contribution"?"active":""} aria-pressed={groupMeasure==="contribution"} onClick={()=>setGroupMeasure("contribution")}>Contribution to portfolio return</button>
+                  <button className={groupMeasure==="within"?"active":""} aria-pressed={groupMeasure==="within"} onClick={()=>setGroupMeasure("within")}>Return within {grouping==="Sectors"?"sector":grouping==="Stocks"?"stock":"sleeve"}</button>
+                </div>
+              </div>
+              <GroupReturnsChart dates={grouped.dates} groups={grouped.groups} measure={groupMeasure} selectedGroup={selectedGroup} onSelectGroup={selectGroup} selectedDate={day.date} onSelectDate={setSelectedDate}/>
+            </>}
           </div>
         </section>
       </div>

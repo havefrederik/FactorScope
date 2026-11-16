@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildPortfolioGroups, groupHoldingsSnapshot } from "../lib/portfolio-groups.ts";
+import { buildPortfolioGroups, groupHoldingsSnapshot, sectorHoldingPeriods } from "../lib/portfolio-groups.ts";
 
 const dates=["2025-01-30","2025-01-31","2025-02-03","2025-02-04"];
 const payload={series:Object.fromEntries([["SPY",[100,100,100,100]],["A",[100,110,121,108.9]],["B",[100,90,90,99]]].map(([ticker,prices])=>[ticker,{points:dates.map((date,i)=>({date,close:prices[i]}))}]))};
@@ -74,4 +74,23 @@ test('a missing return interval stops contribution and within-group return toget
   near(a.contribution[1],.05);
   assert.deepEqual(a.contribution.slice(2),[null,null]);
   assert.deepEqual(a.curve.slice(2),[null,null]);
+});
+
+test('sector holding periods follow closing positions, retain re-entries and split reversals',()=>{
+  const history={tickers:['A','B','Outside'],days:[
+    {date:dates[0],values:[8,0,1]},
+    {date:dates[1],values:[0,4,1],returnValues:[9,0,1]},
+    {date:dates[2],values:[2,-2,1],returnValues:[0,4,1]},
+    {date:dates[3],values:[3,-3,1]}
+  ]};
+  const periods=sectorHoldingPeriods(history,[0,1]);
+  assert.deepEqual(periods,[
+    {ticker:'A',side:'Long',firstClose:dates[2],exitClose:null},
+    {ticker:'B',side:'Short',firstClose:dates[2],exitClose:null},
+    {ticker:'B',side:'Long',firstClose:dates[1],exitClose:dates[2]},
+    {ticker:'A',side:'Long',firstClose:dates[0],exitClose:dates[1]}
+  ]);
+  assert.deepEqual(sectorHoldingPeriods({...history,days:history.days.slice(3)},[0]),[
+    {ticker:'A',side:'Long',firstClose:dates[3],exitClose:null}
+  ]);
 });

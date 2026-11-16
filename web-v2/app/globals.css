@@ -547,6 +547,24 @@
 .group-return-tooltip{position:absolute;left:55px;top:12px;pointer-events:none;display:grid;gap:7px;width:245px;border:1px solid var(--line2);border-radius:4px;background:#1c1e1bee;padding:10px;font-size:9px;box-shadow:0 5px 18px #0004}.group-return-tooltip strong{margin-bottom:3px;font-size:10px}.group-return-tooltip span{display:grid;grid-template-columns:6px minmax(0,1fr) auto;align-items:center;gap:6px}.group-return-tooltip b{font:10px var(--font-geist-mono),monospace;color:var(--text)}
 .group-chart-controls{justify-content:space-between;flex-wrap:wrap;align-items:center}
 .group-chart-controls>div{display:flex;flex-wrap:wrap;gap:3px}
+.group-chart-controls .group-contribution-title{margin:0;font-size:13px;font-weight:500}
+.sector-detail-heading,.sector-period-toolbar,.sector-period-filter{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.sector-detail-heading,.sector-period-toolbar{justify-content:space-between;padding:10px 14px}
+.sector-detail-heading h2,.sector-period-toolbar h3{font-size:15px;font-weight:550;margin:0}
+.sector-detail-heading h2:focus{outline:none}
+.sector-detail-heading button,.sector-period-filter button,.sector-period-filter select{color:var(--text);background:transparent;border:1px solid var(--line2);border-radius:4px;font:inherit;font-size:11px;padding:5px 8px}
+.sector-period-filter select{color-scheme:dark;background:var(--panel)}
+.sector-period-filter button[aria-pressed=true]{background:#34372e}
+.sector-detail .group-return-chart{height:270px}
+.sector-period-toolbar{border-top:1px solid var(--line);margin-top:10px}
+.sector-period-scroll{max-height:300px;overflow:auto}
+.sector-period-scroll table{width:100%;border-collapse:separate;border-spacing:0;text-align:left;font-size:12px}
+.sector-period-scroll th,.sector-period-scroll td{padding:6px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+.sector-period-scroll thead th{background:#212421;color:var(--muted);position:sticky;top:0;font-size:11px;font-weight:500}
+.sector-period-scroll td{font-variant-numeric:tabular-nums}
+.sector-period-scroll small{display:block;color:var(--muted);font-size:10px;font-weight:400}
+.sector-period-empty{padding:8px 14px 14px;margin:0;font-size:12px;color:var(--muted)}
+@media(max-width:600px){.sector-detail .group-return-chart{height:215px}.sector-period-scroll th,.sector-period-scroll td{padding:6px 8px}}
 .group-idle-band rect{fill:#9ba49a;fill-opacity:.11}
 .group-return-tooltip small{display:block;color:var(--muted);font:9px var(--font-geist-sans),sans-serif;text-align:right}
 .group-return-caption{font-size:9px;line-height:1.5;color:var(--muted);padding:0 14px;margin:8px 0}

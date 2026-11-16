@@ -12,6 +12,29 @@ export type ReturnGroup = {
   incomplete: boolean;
 };
 
+export type HoldingPeriod = {
+  ticker: string;
+  side: "Long" | "Short";
+  firstClose: string;
+  exitClose: string | null;
+};
+
+export function sectorHoldingPeriods(example: Pick<ExamplePortfolioResult, "tickers" | "days">, indexes: number[]) {
+  const periods: HoldingPeriod[] = [];
+  for (const index of indexes) {
+    let previousSide: HoldingPeriod["side"] | null = null;
+    for (const day of example.days) {
+      const value = day.values[index];
+      const side = value > 0 ? "Long" : value < 0 ? "Short" : null;
+      if (side === previousSide) continue;
+      if (previousSide) periods[periods.length - 1].exitClose = day.date;
+      if (side) periods.push({ticker: example.tickers[index], side, firstClose: day.date, exitClose: null});
+      previousSide = side;
+    }
+  }
+  return periods.sort((a,b) => b.firstClose.localeCompare(a.firstClose) || a.ticker.localeCompare(b.ticker));
+}
+
 // Time-weighted gross returns of the actual sector sleeves. Recover each session's
 // post-rebalance, beginning capital from ending positions and adjusted-price ratios.
 // Transfers between sleeves and execution costs are not sector investment returns.

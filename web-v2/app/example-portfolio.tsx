@@ -3,19 +3,20 @@ import { useMemo, useState, type ReactNode } from "react";
 import { buildPortfolioDecomposition, type MarketPayload, type SecurityDecomposition } from "@/lib/analytics";
 import type { ExamplePortfolioResult } from "@/lib/example-portfolio";
 import { buildPortfolioGroups, type PortfolioGrouping } from "@/lib/portfolio-groups";
-import GroupReturnsChart, { groupStyle, type GroupMeasure } from "./group-returns-chart";
+import SectorHoldingsDetail from "./sector-holdings-detail";
+import GroupReturnsChart, { groupStyle } from "./group-returns-chart";
 import PortfolioHoldings from "./portfolio-holdings";
 
 const money=(n:number)=>new Intl.NumberFormat("en-US",{style:"currency",currency:"USD",maximumFractionDigits:0}).format(n);
 const pct=(n:number)=>`${(100*n).toFixed(2)}%`;
-export default function ExamplePortfolio({riskSummary,payload,example,sectors,firstMonth,setFirstMonth,cost,setCost,selectedDate,setSelectedDate,onSelectTicker,renderDecomposition,portfolioName="US Equity Portfolio",isAI=false,fixedCosts=false}:{riskSummary?:ReactNode;portfolioName?:string;isAI?:boolean;fixedCosts?:boolean;payload:MarketPayload;example:ExamplePortfolioResult;sectors:Record<string,string>;firstMonth:string;setFirstMonth:(value:string)=>void;cost:number;setCost:(value:number)=>void;selectedDate:string;setSelectedDate:(value:string)=>void;onSelectTicker:(ticker:string)=>void;renderDecomposition:(decomposition:SecurityDecomposition)=>ReactNode}){
+export default function ExamplePortfolio({riskSummary,payload,example,sectors,stockNames,firstMonth,setFirstMonth,cost,setCost,selectedDate,setSelectedDate,onSelectTicker,renderDecomposition,portfolioName="US Equity Portfolio",isAI=false,fixedCosts=false}:{riskSummary?:ReactNode;portfolioName?:string;isAI?:boolean;fixedCosts?:boolean;payload:MarketPayload;example:ExamplePortfolioResult;sectors:Record<string,string>;stockNames:Record<string,string>;firstMonth:string;setFirstMonth:(value:string)=>void;cost:number;setCost:(value:number)=>void;selectedDate:string;setSelectedDate:(value:string)=>void;onSelectTicker:(ticker:string)=>void;renderDecomposition:(decomposition:SecurityDecomposition)=>ReactNode}){
   const end=payload.asOf??"";
   const decomposition=useMemo(()=>example?buildPortfolioDecomposition(payload,example.analytics):null,[payload,example]);
   const [chartView,setChartView]=useState<"Attribution"|"Returns by group">("Attribution");
   const [grouping,setGrouping]=useState<PortfolioGrouping>("Stocks");
-  const [groupMeasure,setGroupMeasure]=useState<GroupMeasure>("contribution");
   const grouped=useMemo(()=>buildPortfolioGroups(payload,example,sectors,grouping),[payload,example,sectors,grouping]);
   const [selectedGroup,setSelectedGroup]=useState<string|null>(null);
+  const selectedSector=grouping==="Sectors"?grouped.groups.find(group=>group.name===selectedGroup):undefined;
   const index=Math.max(0,selectedDate?example.days.findLastIndex(day=>day.date<=selectedDate):example.days.length-1);
   const day=example.days[index],rebalance=example.rebalances[day.rebalance];
   function selectGroup(name:string|null){setSelectedGroup(name);setChartView("Returns by group");}
@@ -37,12 +38,14 @@ export default function ExamplePortfolio({riskSummary,payload,example,sectors,fi
                 <div role="group" aria-label="Group chart and holdings">
                   {(["Stocks","Sectors",...(example.days.some(d=>d.values.some(v=>v<0))?["Long / short"]:[])] as PortfolioGrouping[]).map(mode=><button key={mode} className={grouping===mode?"active":""} aria-pressed={grouping===mode} onClick={()=>{setGrouping(mode);setSelectedGroup(null);}}>{mode}</button>)}
                 </div>
-                <div role="group" aria-label="Return measure">
-                  <button className={groupMeasure==="contribution"?"active":""} aria-pressed={groupMeasure==="contribution"} onClick={()=>setGroupMeasure("contribution")}>Contribution to portfolio return</button>
-                  <button className={groupMeasure==="within"?"active":""} aria-pressed={groupMeasure==="within"} onClick={()=>setGroupMeasure("within")}>Return within {grouping==="Sectors"?"sector":grouping==="Stocks"?"stock":"sleeve"}</button>
-                </div>
+                {!selectedSector&&<h2 className="group-contribution-title">Contribution to portfolio return</h2>}
               </div>
-              <GroupReturnsChart dates={grouped.dates} groups={grouped.groups} measure={groupMeasure} selectedGroup={selectedGroup} onSelectGroup={selectGroup} selectedDate={day.date} onSelectDate={setSelectedDate}/>
+              {selectedSector
+                ? <SectorHoldingsDetail key={selectedSector.name} group={selectedSector} dates={grouped.dates} example={example} names={stockNames}
+                    selectedDate={day.date} onSelectDate={setSelectedDate} onBack={()=>selectGroup(null)}/>
+                : <GroupReturnsChart dates={grouped.dates} groups={grouped.groups} measure="contribution" selectedGroup={selectedGroup}
+                    onSelectGroup={selectGroup} selectedDate={day.date} onSelectDate={setSelectedDate}
+                    caption={grouping==="Sectors"?"Select a sector to see the return on its holdings and when each stock was held.":"Select a group to highlight its contribution. Click a date to inspect positions."}/>}
             </>}
           </div>
         </section>

@@ -17,7 +17,7 @@ const sectorStyles:Record<string,{color:string;label:string}>={
   "Real Estate":{color:"#d5b08a",label:"Real estate"},
 };
 export function groupStyle(name:string){const palette=["#56b4ff","#ffab40","#74df70","#c58aff","#ff667d","#34e0cd","#f5df4d","#f4f5f7","#ff8bd4","#a6bdff"];const hash=[...name].reduce((n,c)=>n*31+c.charCodeAt(0),0)>>>0;return sectorStyles[name]??{color:name==="Long"?"#34e0cd":name==="Short"?"#ff667d":palette[hash%palette.length],label:name};}
-export type GroupMeasure = "contribution" | "within";
+type GroupMeasure = "contribution" | "within";
 
 function idleIntervals(group: ReturnGroup | undefined) {
   const intervals: {start:number; end:number}[] = [];
@@ -31,7 +31,7 @@ function idleIntervals(group: ReturnGroup | undefined) {
   return intervals;
 }
 
-export default function GroupReturnsChart({dates,groups,measure,selectedGroup,onSelectGroup,selectedDate,onSelectDate}:{dates:string[];groups:ReturnGroup[];measure:GroupMeasure;selectedGroup:string|null;onSelectGroup:(name:string|null)=>void;selectedDate:string;onSelectDate:(date:string)=>void}){
+export default function GroupReturnsChart({dates,groups,measure,selectedGroup,onSelectGroup,selectedDate,onSelectDate,caption}:{dates:string[];groups:ReturnGroup[];measure:GroupMeasure;selectedGroup:string|null;onSelectGroup?:(name:string|null)=>void;selectedDate:string;onSelectDate:(date:string)=>void;caption:string}){
   const [hover,setHover]=useState<number|null>(null);
   const width=900,height=400,left=62,right=140,top=20,bottom=34;
   const unit=measure==="contribution"?" pp":"%";
@@ -61,9 +61,9 @@ export default function GroupReturnsChart({dates,groups,measure,selectedGroup,on
   if(labels.length&&labels.at(-1)!.top>height-bottom){labels.at(-1)!.top=height-bottom;for(let i=labels.length-2;i>=0;i--)labels[i].top=Math.min(labels[i].top,labels[i+1].top-27);}
   function indexAt(event:React.PointerEvent<SVGSVGElement>|React.MouseEvent<SVGSVGElement>){const rect=event.currentTarget.getBoundingClientRect();const svgX=(event.clientX-rect.left)/rect.width*width;return Math.max(0,Math.min(dates.length-1,Math.round((svgX-left)/(width-left-right)*(dates.length-1))));}
   return <div className="group-return-workspace">
-    <div className="group-return-legend" aria-label="Highlight a return group">{groups.map(group=><button key={group.name} aria-pressed={selectedGroup===group.name} className={selectedGroup===group.name?"active":""} onClick={()=>onSelectGroup(selectedGroup===group.name?null:group.name)}><svg width="25" height="10" viewBox="0 0 25 10" aria-hidden="true"><line x1="0" x2="25" y1="5" y2="5" stroke={groupStyle(group.name).color} strokeWidth="1.5"/></svg>{group.name}</button>)}{selectedGroup&&<button onClick={()=>onSelectGroup(null)}>Show all</button>}</div>
+    {onSelectGroup&&<div className="group-return-legend" aria-label="Select a return group">{groups.map(group=><button key={group.name} aria-pressed={selectedGroup===group.name} className={selectedGroup===group.name?"active":""} onClick={()=>onSelectGroup(selectedGroup===group.name?null:group.name)}><svg width="25" height="10" viewBox="0 0 25 10" aria-hidden="true"><line x1="0" x2="25" y1="5" y2="5" stroke={groupStyle(group.name).color} strokeWidth="1.5"/></svg>{group.name}</button>)}{selectedGroup&&<button onClick={()=>onSelectGroup(null)}>Show all</button>}</div>}
     <div className="group-return-chart">
-      <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" role="img" aria-label={measure==="contribution"?"Cumulative contributions to portfolio return in percentage points":"Cumulative returns within groups in percent"} onPointerMove={event=>setHover(indexAt(event))} onPointerLeave={()=>setHover(null)} onClick={event=>onSelectDate(dates[indexAt(event)])}>
+      <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" role="img" aria-label={measure==="contribution"?"Cumulative contributions to portfolio return in percentage points":`Cumulative return on ${selectedGroup} holdings in percent`} onPointerMove={event=>setHover(indexAt(event))} onPointerLeave={()=>setHover(null)} onClick={event=>onSelectDate(dates[indexAt(event)])}>
         {ticks.map(tick=><g key={tick}><line className="group-gridline" x1={left} x2={width-right} y1={y(tick)} y2={y(tick)}/><text x={left-8} y={y(tick)+4} textAnchor="end">{Number((tick*100).toFixed(max-min<.05?2:0))}{unit}</text></g>)}
         <line className="group-zero" x1={left} x2={width-right} y1={y(0)} y2={y(0)}/>
         {dateTicks.map(i=><g key={i}><line className="group-gridline" x1={x(i)} x2={x(i)} y1={top} y2={height-bottom}/><text x={x(i)} y={height-8} textAnchor={i===0?"start":i===dates.length-1?"end":"middle"}>{new Date(`${dates[i]}T00:00:00Z`).toLocaleDateString("en-US",{month:"short",year:"2-digit",timeZone:"UTC"})}</text></g>)}
@@ -75,7 +75,7 @@ export default function GroupReturnsChart({dates,groups,measure,selectedGroup,on
       </svg>
       {hover!==null&&<div className="group-return-tooltip"><strong>{dates[inspectIndex]}</strong>{series.filter(group=>!selectedGroup||group.name===selectedGroup).map(group=><span key={group.name}><i style={{background:groupStyle(group.name).color}}/>{group.name}<b>{group.points[inspectIndex]==null?"Unavailable":<>{format(group.points[inspectIndex]!)}{!group.held[inspectIndex]&&<small>No holdings</small>}</>}</b></span>)}</div>}
     </div>
-    <p className="group-return-caption">{measure==="contribution"?"Cumulative contribution before trading costs, in percentage points.":"Cumulative return on $1 in each group, before trading costs."} Select a group to see periods without holdings. Click a date to inspect positions.</p>
+    <p className="group-return-caption">{caption}</p>
     {groups.some(group=>group.incomplete)&&<p className="group-return-caption">Some group paths stop where allocated securities lack aligned prices.</p>}
   </div>;
 }

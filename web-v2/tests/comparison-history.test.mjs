@@ -66,3 +66,13 @@ test('monthly comparison preserves baseline costs and uses alternative turnover 
  // No turnover charge on a session that is not a rebalance.
  near(costed.dailyReturns[5],gross.dailyReturns[5]);
 });
+
+test('weekly trading costs fall on the execution close after old positions earn the return',()=>{
+ const {p,dates}=fixture(4);
+ for(const ticker of ['A','B'])p.series[ticker].points.forEach((v,i)=>{v.close=ticker==='A'&&i===3?200:100;});
+ const h={tickers:['A','B'],rebalances:[{targets:[1,0]},{targets:[0,1]}],days:dates.map((date,i)=>({date,nav:1,rebalance:i<2?0:1,values:i<2?[1,0]:[0,1]})),analytics:{dates,benchmarkCurve:[1,1,1,1]}};
+ const result=comparisonHistory(p,h,'weekly',{A:.5,B:.5},{A:.4,B:.6},dates[0],dates[3],1,5);
+ near(result.curve[1],1);
+ near(result.curve[2],(1-.0005)/(1+.0005));
+ near(result.curve[3],result.curve[2]);
+});

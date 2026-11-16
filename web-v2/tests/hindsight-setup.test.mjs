@@ -18,7 +18,7 @@ test('One optimizer exposes a dated proposal and a collapsible historical test w
     const payload={asOf:dates.at(-1),series};
     const forecast={asOf:payload.asOf,tickers,covarianceMatrix:[[.04,.01],[.01,.05]],portfolioVolatility:.16,observations:252};
     const noop=()=>{};
-    const props={payload,forecast,holdings:tickers.map(ticker=>({ticker,name:ticker,value:50})),riskEstimator:'Ledoit–Wolf',onApply:noop,onSelectTicker:noop,onAsOfChange:noop,setRiskEstimator:noop,onHistoryTestOpenChange:noop};
+    const props={runs:[],onRunsChange:noop,onReviewRun:noop,portfolioName:"Test portfolio",payload,forecast,holdings:tickers.map(ticker=>({ticker,name:ticker,value:50})),riskEstimator:'Ledoit–Wolf',onApply:noop,onSelectTicker:noop,onAsOfChange:noop,setRiskEstimator:noop,onHistoryTestOpenChange:noop};
     const hindsight=renderToStaticMarkup(React.createElement(Optimizer,{...props,historyTestOpen:true}));
     const optimizer=renderToStaticMarkup(React.createElement(Optimizer,{...props,historyTestOpen:false}));
     for(const label of ['Optimizer covariance estimator','Ledoit–Wolf shrinkage method','Risk forecast horizon','Optimization objective','Portfolio exposure preset','Optimizer gross exposure limit','Optimizer position cap','Optimizer turnover limit','AAA min weight','Lock AAA weight']){

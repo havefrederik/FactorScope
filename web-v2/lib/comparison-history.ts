@@ -12,7 +12,7 @@ export function historyWindow(source: PortfolioAnalytics, start: string, end: st
   return pathAnalytics(dates, curve, benchmarkCurve, capital);
 }
 
-function pathAnalytics(dates: string[], curve: number[], benchmarkCurve: number[], capital: number): PortfolioAnalytics {
+export function pathAnalytics(dates: string[], curve: number[], benchmarkCurve: number[], capital: number): PortfolioAnalytics {
   const dailyReturns = curve.slice(1).map((value, i) => value / curve[i] - 1);
   const benchmarkReturns = benchmarkCurve.slice(1).map((value, i) => value / benchmarkCurve[i] - 1);
   const mean = (values: number[]) => values.reduce((sum, value) => sum + value, 0) / values.length;
@@ -34,7 +34,7 @@ function pathAnalytics(dates: string[], curve: number[], benchmarkCurve: number[
  * absent from the selected snapshot retain their historical sizing preference.
  * Long and short sleeves are normalized separately. An empty sleeve stays in cash.
  */
-export function comparisonHistory(payload: MarketPayload, history: ExamplePortfolioResult, mode: 'daily' | 'monthly',
+export function comparisonHistory(payload: MarketPayload, history: ExamplePortfolioResult, mode: 'daily' | 'monthly' | 'weekly',
   current: Record<string, number>, proposed: Record<string, number>, start: string, end: string, capital: number, costBps = 0) {
   const keys = new Set([...Object.keys(current), ...Object.keys(proposed)]);
   for (const ticker of keys) if (!Number.isFinite(proposed[ticker] ?? 0)) throw Error(`Invalid weight for ${ticker}.`);
@@ -46,28 +46,35 @@ export function comparisonHistory(payload: MarketPayload, history: ExamplePortfo
   const maps = history.tickers.map(t => new Map((payload.series[t]?.points ?? []).map(p => [p.date, p.close])));
   let values = history.tickers.map(() => 0), cash = 1, nav = 1, previousRebalance = -1;
   const curve = [1];
-  const rate = mode === 'monthly' ? Math.max(0, costBps) / 10000 : 0;
+  const rate = mode !== 'daily' ? Math.max(0, costBps) / 10000 : 0;
+  function applyTargets(base:number[], feeRate=rate) {
+    const scores = base.map((weight, j) => {
+      if (!weight) return 0;
+      const ticker = history.tickers[j];
+      if (mode === 'daily') return proposed[ticker] ?? 0;
+      const anchor = current[ticker] ?? 0;
+      if (Math.abs(anchor) > 1e-12) return weight * (proposed[ticker] ?? 0) / anchor;
+      // Previously selected names absent from today's book remain in their historical months.
+      return Math.abs(proposed[ticker] ?? 0) > 1e-12 ? proposed[ticker] : weight;
+    });
+    const positive = scores.reduce((s, w) => s + Math.max(0, w), 0);
+    const negative = scores.reduce((s, w) => s + Math.max(0, -w), 0);
+    const budgetScale = mode === 'daily' ? 1 : base.reduce((s, w) => s + Math.abs(w), 0) / Math.max(currentInvested, 1e-12);
+    const targets = scores.map(w => w > 0 && positive > 0 ? w / positive * long * budgetScale : w < 0 && negative > 0 ? w / negative * short * budgetScale : 0);
+    let after = nav;
+    for (let k = 0; k < 30; k++) after = nav - feeRate * targets.reduce((s, w, j) => s + Math.abs(w * after - values[j]), 0);
+    values = targets.map(w => w * after); cash = after - values.reduce((s, v) => s + v, 0);
+    nav = after;
+  }
+  if(mode==='weekly'){
+    const first=history.days[0];
+    applyTargets(first.values.map(v=>v/first.nav),0);
+  }
   for (let i = 1; i < history.days.length && history.days[i].date <= end; i++) {
     const previous = history.days[i - 1], day = history.days[i];
-    const rebalanceIndex = mode === 'daily' ? previous.rebalance : day.rebalance;
-    if (rebalanceIndex !== previousRebalance && rebalanceIndex >= 0) {
-      const base = history.rebalances[rebalanceIndex].targets;
-      const scores = base.map((weight, j) => {
-        if (!weight) return 0;
-        const ticker = history.tickers[j];
-        if (mode === 'daily') return proposed[ticker] ?? 0;
-        const anchor = current[ticker] ?? 0;
-        if (Math.abs(anchor) > 1e-12) return weight * (proposed[ticker] ?? 0) / anchor;
-        // Previously selected names absent from today's book remain in their historical months.
-        return Math.abs(proposed[ticker] ?? 0) > 1e-12 ? proposed[ticker] : weight;
-      });
-      const positive = scores.reduce((s, w) => s + Math.max(0, w), 0);
-      const negative = scores.reduce((s, w) => s + Math.max(0, -w), 0);
-      const budgetScale = mode === 'daily' ? 1 : base.reduce((s, w) => s + Math.abs(w), 0) / Math.max(currentInvested, 1e-12);
-      const targets = scores.map(w => w > 0 && positive > 0 ? w / positive * long * budgetScale : w < 0 && negative > 0 ? w / negative * short * budgetScale : 0);
-      let after = nav;
-      for (let k = 0; k < 30; k++) after = nav - rate * targets.reduce((s, w, j) => s + Math.abs(w * after - values[j]), 0);
-      values = targets.map(w => w * after); cash = after - values.reduce((s, v) => s + v, 0);
+    const rebalanceIndex = mode === 'monthly' ? day.rebalance : previous.rebalance;
+    if (mode !== 'weekly' && rebalanceIndex !== previousRebalance && rebalanceIndex >= 0) {
+      applyTargets(history.rebalances[rebalanceIndex].targets);
       previousRebalance = rebalanceIndex;
     }
     values = values.map((value, j) => {
@@ -78,6 +85,10 @@ export function comparisonHistory(payload: MarketPayload, history: ExamplePortfo
     });
     nav = cash + values.reduce((s, v) => s + v, 0);
     if (!(nav > 0) || !Number.isFinite(nav)) throw Error(`Alternative portfolio exhausts its capital on ${day.date}.`);
+    // Weekly research trades execute after the old holdings earn the execution day's return.
+    if (mode === 'weekly' && day.rebalance >= 0 && day.rebalance !== previous.rebalance) {
+      applyTargets(history.rebalances[day.rebalance].targets);
+    }
     curve.push(nav);
   }
   return historyWindow(pathAnalytics(history.analytics.dates.slice(0, curve.length), curve, history.analytics.benchmarkCurve.slice(0, curve.length), capital), start, end, capital);

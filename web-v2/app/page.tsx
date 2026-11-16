@@ -11,6 +11,8 @@ import AboutMethodology from "./about-methodology";
 import { parseForecastBook, parseHoldingsBundle, parsePrices, withUploadedPrices, type ForecastBook, type UploadedPrices, type CsvKind } from "@/lib/portfolio-imports";
 import { priceUniverse, normalizeYahooSymbol } from "@/lib/market-data-request";
 import CsvUploadDialog from "./csv-upload-dialog";
+import diversificationSeed from "@/lib/diversification-roster.json";
+import {diversificationName,diversificationThrough,researchPortfolio,type ResearchAccount} from "@/lib/diversification-portfolio";
 import {aiPortfolioSeed, AI_PORTFOLIO_DATE} from "@/lib/ai-portfolio";
 import CovarianceForecastView from "./covariance-forecast";
 import { PublishedFundContext, PublishedFundHoldings } from "./published-fund";
@@ -25,7 +27,9 @@ import PortfolioOptimizer from "./portfolio-optimizer";
 import HedgeSupport from "./hedge-support";
 import type {RiskEstimator} from "@/lib/shrinkage-risk";
 import StrategyWorkspace, { type StrategySettings, type StrategyWorkspaceProps } from "./strategy-workspace";
-import PortfolioComparisonWorkspace from "./portfolio-comparison";
+import HistoryTestComparison from "./history-test-comparison";
+import {historyRunStorage,readHindsightRuns,type HindsightRun} from "@/lib/hindsight-runs";
+import PortfolioComparisonWorkspace, {type ComparisonView} from "./portfolio-comparison";
 import FactorExposureChart from "./factor-exposure-chart";
 import { buildExamplePortfolio, exampleHoldingsSnapshot } from "@/lib/example-portfolio";
 import { publishedMarketNeutralFund } from "@/lib/published-fund";
@@ -33,7 +37,7 @@ import { averagePairwiseCorrelation, buildAnalytics, buildCovarianceForecast, bu
 
 type Holding = { ticker: string; name: string; sector: string; value: number; beta: number; vol: number; risk: number };
 type View = "Hedge Support" | "Overview" | "Compare" | "Optimizer" | "Strategy Analysis" | "Risk Analysis" | "Security Analysis" | "Performance" | "Scenario Lab" | "Methodology" | "Project Brief";
-type DemoKey = "ai" | "equity" | "published-market-neutral" | "published-dow" | "example";
+type DemoKey = "diversification" | "ai" | "equity" | "published-market-neutral" | "published-dow" | "example";
 
 const equitySeed: Holding[] = [
   { ticker: "AAPL", name: "Apple", sector: "Technology", value: 40000, beta: 1.14, vol: 24.8, risk: 4.0 },
@@ -87,11 +91,11 @@ function Icon({ name }: { name: string }) {
 }
 
 function PerformanceChart({ portfolio, benchmark, tertiary, dates, startDate, endDate, large = false, primaryLabel = "Current portfolio", secondaryLabel = "S&P 500", tertiaryLabel = "Market reference", definition = "Growth of $1 invested at the start of the period. Current dollar allocations are held buy-and-hold; cash earns 0%." }: { portfolio: number[]; benchmark: number[]; tertiary?: number[]; dates?: string[]; startDate: string; endDate: string; large?: boolean; primaryLabel?: string; secondaryLabel?: string; tertiaryLabel?: string; definition?: string }) {
-  const length = Math.min(portfolio.length, benchmark.length, tertiary?.length ?? Number.POSITIVE_INFINITY, dates?.length ?? Number.POSITIVE_INFINITY);
+  const length = Math.min(portfolio.length, benchmark.length || Infinity, tertiary?.length ?? Number.POSITIVE_INFINITY, dates?.length ?? Number.POSITIVE_INFINITY);
   const [chartMode,setChartMode]=useState<"return"|"drawdown">("return");
   const [hoverIndex,setHoverIndex]=useState<number|null>(null);
   const [hidden,setHidden]=useState<string[]>([]);
-  const visible=(key:string)=>!hidden.includes(key);
+  const visible=(key:string)=>!hidden.includes(key)&&(key!=="benchmark"||benchmark.length>0);
   const toggle=(key:string)=>setHidden(old=>old.includes(key)?old.filter(k=>k!==key):[...old,key]);
   const toDrawdown=(values:number[])=>{let peak=values[0]??1;return values.map(v=>{peak=Math.max(peak,v);return v/peak;});};
   const primary=chartMode==="return"?portfolio:toDrawdown(portfolio),secondary=chartMode==="return"?benchmark:toDrawdown(benchmark),third=tertiary?(chartMode==="return"?tertiary:toDrawdown(tertiary)):undefined;
@@ -121,13 +125,13 @@ function PerformanceChart({ portfolio, benchmark, tertiary, dates, startDate, en
     <div className="performance-controls"><button aria-pressed={chartMode==="return"} onClick={()=>setChartMode("return")}>Cumulative return</button><button aria-pressed={chartMode==="drawdown"} onClick={()=>setChartMode("drawdown")}>Drawdown</button><time>{dateAt(inspected)}</time></div>
     <div className="performance-legend">
       <button aria-pressed={visible("portfolio")} onClick={()=>toggle("portfolio")}><i className="portfolio-swatch" />{primaryLabel} <b>{pct(portfolioReturn * 100)}</b></button>
-      <button aria-pressed={visible("benchmark")} onClick={()=>toggle("benchmark")}><i className="benchmark-swatch" />{secondaryLabel} <b>{pct(benchmarkReturn * 100)}</b></button>
+      {benchmark.length>0&&<button aria-pressed={visible("benchmark")} onClick={()=>toggle("benchmark")}><i className="benchmark-swatch" />{secondaryLabel} <b>{pct(benchmarkReturn * 100)}</b></button>}
       {tertiary && tertiaryReturn !== null && <button aria-pressed={visible("tertiary")} onClick={()=>toggle("tertiary")}><i className="tertiary-swatch" />{tertiaryLabel} <b>{pct(tertiaryReturn * 100)}</b></button>}
     </div>
     <div className={`line-chart ${large ? "large" : ""}`} tabIndex={0} role="slider" aria-label="Inspect performance by date" aria-valuemin={0} aria-valuemax={Math.max(0,length-1)} aria-valuenow={inspected} aria-valuetext={dateAt(inspected)} onBlur={()=>setHoverIndex(null)} onPointerLeave={()=>setHoverIndex(null)} onKeyDown={e=>{if(["ArrowLeft","ArrowRight","Home","End","Escape"].includes(e.key)){e.preventDefault();setHoverIndex(e.key==="Escape"?null:e.key==="Home"?0:e.key==="End"?length-1:Math.max(0,Math.min(length-1,inspected+(e.key==="ArrowLeft"?-1:1))));}}}>
       <span className="chart-y-title">{chartMode==="return"?"CUMULATIVE RETURN":"DRAWDOWN"}</span>
       <div className="chart-y-axis">{yTicks.map((tick) => <span key={tick} style={{ bottom: `${((tick - min) / Math.max(max - min, .01)) * 84 + 8}%` }}>{pct((tick - 1) * 100).replace("+", "")}</span>)}</div>
-      <svg onPointerMove={inspect} onPointerDown={inspect} className="spark" viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label={`${chartMode==="return"?"Cumulative return":"Drawdown"}: ${primaryLabel} ${pct(portfolioReturn * 100)}, ${secondaryLabel} ${pct(benchmarkReturn * 100)}${tertiaryReturn === null ? "" : `, ${tertiaryLabel} ${pct(tertiaryReturn * 100)}`}`}>
+      <svg onPointerMove={inspect} onPointerDown={inspect} className="spark" viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label={`${chartMode==="return"?"Cumulative return":"Drawdown"}: ${primaryLabel} ${pct(portfolioReturn * 100)}${benchmark.length ? ", "+secondaryLabel+" "+pct(benchmarkReturn*100) : ""}${tertiaryReturn === null ? "" : `, ${tertiaryLabel} ${pct(tertiaryReturn * 100)}`}`}>
         {yTicks.map(tick => <line key={tick} x1="0" y1={92 - ((tick - min) / Math.max(max - min, .01)) * 84} x2="100" y2={92 - ((tick - min) / Math.max(max - min, .01)) * 84} className="gridline" />)}
         {dateIndexes.map(index => <line key={index} x1={index / Math.max(length - 1, 1) * 100} y1="8" x2={index / Math.max(length - 1, 1) * 100} y2="92" className="chart-date-guide" />)}
         <line x1="0" y1={92 - ((1 - min) / Math.max(max - min, .01)) * 84} x2="100" y2={92 - ((1 - min) / Math.max(max - min, .01)) * 84} className="baseline" />
@@ -441,9 +445,9 @@ export default function Home() {
     });
     return () => cancelAnimationFrame(frame);
   }, [csvGuideNavigation]);
-  const [demoKey,setDemoKey]=useState<DemoKey>("ai");
-  const [customHoldings, setHoldings] = useState(aiPortfolioSeed);
-  const [baselineHoldings, setBaselineHoldings] = useState(aiPortfolioSeed);
+  const [demoKey,setDemoKey]=useState<DemoKey>("diversification");
+  const [customHoldings, setHoldings] = useState(diversificationSeed);
+  const [baselineHoldings, setBaselineHoldings] = useState(diversificationSeed);
   const [editing, setEditing] = useState(false);
   const [marketShock, setMarketShock] = useState(-10);
   const [techShock, setTechShock] = useState(-8);
@@ -456,7 +460,7 @@ export default function Home() {
   const [dataErrorKind, setDataErrorKind] = useState<"request" | "connection">("connection");
   const [portfolioError,setPortfolioError]=useState<string|null>(null);
   const [portfolioSource,setPortfolioSource]=useState<"demo"|"uploaded">("demo");
-  const [portfolioName,setPortfolioName]=useState("AI Theme Portfolio");
+  const [portfolioName,setPortfolioName]=useState(diversificationName);
   const [optimizerProposal,setOptimizerProposal]=useState<{weights:Record<string,number>;snapshot:ConstructionSnapshot;signature:string;id:number}|null>(null);
   const [selectedTicker,setSelectedTicker]=useState<string|null>(null);
   const [addingSecurity,setAddingSecurity]=useState(false);
@@ -479,11 +483,26 @@ export default function Home() {
 
   const isPublishedFund=portfolioSource==="demo"&&demoKey==="published-market-neutral";
   const isArchivedPortfolio=portfolioSource==="demo"&&demoKey==="published-dow";
+  const isResearch=portfolioSource==="demo"&&demoKey==="diversification";
+  const [routeReady,setRouteReady]=useState(false);
+  const [account,setAccount]=useState<ResearchAccount|null>(null);
+  const [accountError,setAccountError]=useState("");
+  const [accountRetry,setAccountRetry]=useState(0);
+  useEffect(()=>{
+    if(!isResearch||!routeReady||account)return;
+    const controller=new AbortController();
+    setAccountError("");
+    fetch("/data/portfolio-18.json",{signal:controller.signal}).then(async r=>{
+      if(!r.ok)throw Error("Portfolio 18’s dated holdings could not be loaded.");
+      return r.json() as Promise<ResearchAccount>;
+    }).then(setAccount).catch(e=>{if(!controller.signal.aborted)setAccountError((e as Error).message);});
+    return ()=>controller.abort();
+  },[routeReady,isResearch,account,accountRetry]);
   const isExample=portfolioSource==="demo"&&demoKey==="example";
   const isAI=portfolioSource==="demo"&&demoKey==="ai";
-  const isReadOnlyPortfolio=isArchivedPortfolio||isExample||isAI;
+  const isReadOnlyPortfolio=isArchivedPortfolio||isExample||isAI||isResearch;
   const defaultExampleMonth=marketData?.asOf?`${Number(marketData.asOf.slice(0,4))-3}-${marketData.asOf.slice(5,7)}`:"";
-  const exampleMonth=exampleFirstMonth||(isAI?aiMetadata?.aiCoverage?.[0]?.date.slice(0,7)??"":defaultExampleMonth);
+  const exampleMonth=exampleFirstMonth||(isResearch?"2022-11":isAI?aiMetadata?.aiCoverage?.[0]?.date.slice(0,7)??"":defaultExampleMonth);
   const exampleData=useMemo(()=>marketData&&isExample&&exampleMonth?buildExamplePortfolio(marketData,exampleUniverse,`${exampleMonth}-01`,marketData.asOf??"",executionCostBps):null,[marketData,isExample,exampleMonth,executionCostBps]);
   const aiResult=useMemo(()=>{
     if(!marketData||!isAI||!exampleMonth||!aiMetadata?.aiCoverage)return {data:null,error:""};
@@ -495,10 +514,11 @@ export default function Home() {
     fetch("https://factorscope-v2.frede2200.chatgpt.site/api/statistical-model",{signal:controller.signal}).then(async response=>{if(!response.ok)throw Error("AI basket history could not be loaded.");const body=await response.json() as StatisticalMetadata;if(!body.aiCoverage?.length)throw Error("AI basket history is being updated. Please retry shortly.");return body}).then(setAiMetadata).catch(e=>{if(!controller.signal.aborted)setAiCoverageError((e as Error).message)});
     return()=>controller.abort();
   },[isAI,aiCoverageRetry]);
-  const overviewData=isAI?aiOverview:exampleData;
+  const researchData=useMemo(()=>isResearch&&account&&marketData?researchPortfolio(account,marketData,exampleMonth+"-01"):null,[isResearch,account,marketData,exampleMonth]);
+  const overviewData=isResearch?researchData:isAI?aiOverview:exampleData;
   const overviewSnapshot=useMemo(()=>overviewData?exampleHoldingsSnapshot(overviewData,analysisEnd||undefined):null,[overviewData,analysisEnd]);
   const exampleSnapshot=useMemo(()=>exampleData?exampleHoldingsSnapshot(exampleData,analysisEnd||undefined):null,[exampleData,analysisEnd]);
-  const holdings:Holding[]=useMemo(()=>isAI&&overviewSnapshot?overviewSnapshot.holdings.map(h=>({...h,name:aiPortfolioSeed.find(s=>s.ticker===h.ticker)?.name??h.ticker,sector:aiPortfolioSeed.find(s=>s.ticker===h.ticker)?.sector??"Cash",beta:0,vol:0,risk:0})):isExample&&exampleSnapshot?exampleSnapshot.holdings.map(h=>{const meta=stockCatalog.find(item=>item[0]===h.ticker);return {...h,name:meta?.[1]??"Cash",sector:meta?.[2]??"Cash",beta:0,vol:0,risk:0}}):customHoldings,[isAI,overviewSnapshot,isExample,exampleSnapshot,customHoldings]);
+  const holdings:Holding[]=useMemo(()=>isResearch&&overviewSnapshot?diversificationSeed.map(h=>({...h,value:overviewSnapshot.holdings.find(item=>item.ticker===h.ticker)?.value??0})):isAI&&overviewSnapshot?overviewSnapshot.holdings.map(h=>({...h,name:aiPortfolioSeed.find(s=>s.ticker===h.ticker)?.name??h.ticker,sector:aiPortfolioSeed.find(s=>s.ticker===h.ticker)?.sector??"Cash",beta:0,vol:0,risk:0})):isExample&&exampleSnapshot?exampleSnapshot.holdings.map(h=>{const meta=stockCatalog.find(item=>item[0]===h.ticker);return {...h,name:meta?.[1]??"Cash",sector:meta?.[2]??"Cash",beta:0,vol:0,risk:0}}):customHoldings,[isResearch,isAI,overviewSnapshot,isExample,exampleSnapshot,customHoldings]);
   const defaultExampleBaseline=useMemo(()=>{const snapshot=exampleData?exampleHoldingsSnapshot(exampleData):null;return snapshot?snapshot.holdings.map(h=>{const meta=stockCatalog.find(item=>item[0]===h.ticker);return {...h,name:meta?.[1]??"Cash",sector:meta?.[2]??"Cash",beta:0,vol:0,risk:0}}):baselineHoldings},[exampleData,baselineHoldings]);
   const comparisonHoldings=isExample?(baselineHoldings.some(h=>h.ticker!=="CASH"&&h.value>0)?baselineHoldings:defaultExampleBaseline):baselineHoldings;
 
@@ -513,6 +533,12 @@ export default function Home() {
   const factorModel = useMemo(() => marketData && analytics ? buildFactorModel(marketData, analytics, total) : null, [marketData, analytics, total]);
   const portfolioDecomposition = useMemo(() => marketData && analytics ? buildPortfolioDecomposition(marketData, analytics) : null, [marketData, analytics]);
   const deferredStrategyConfig=useDeferredValue(appliedStrategyConfig);
+  const [testRuns,setTestRuns]=useState<HindsightRun[]>([]);
+  const [selectedTest,setSelectedTest]=useState("");
+  const [comparisonView,setComparisonView]=useState<ComparisonView>("Allocation & forecast");
+  useEffect(()=>{try {setTestRuns(readHindsightRuns(localStorage.getItem(historyRunStorage)));} catch {}},[]);
+  function updateTestRuns(next:HindsightRun[]){setTestRuns(next);setSelectedTest(next.at(-1)?.id??"");setComparisonView("Strategy tests");}
+  function reviewTest(id:string){setSelectedTest(id);setComparisonView("Strategy tests");setView("Compare");}
   const [historyTestOpen,setHistoryTestOpen]=useState(false);
   const needsCovariance=!isPublishedFund&&!isArchivedPortfolio&&(view==="Overview"||view==="Risk Analysis"&&riskTab==="Risk & Correlation Forecast"||view==="Strategy Analysis"||view==="Compare"||view==="Optimizer");
   const optimizerWorkspaceActive=["Optimizer","Compare","Hedge Support","Strategy Analysis","Scenario Lab"].includes(view);
@@ -537,6 +563,7 @@ export default function Home() {
   const tickerKey = isExample?exampleUniverse.join("|"):[...new Set([...customHoldings, ...baselineHoldings].map((holding) => holding.ticker))].join("|");
   const loadMarketData = useCallback(async () => {
     const request=++marketRequest.current;
+    if(!routeReady)return;
     if(isArchivedPortfolio){setMarketData(null);setDataError(null);setLoading(false);return;}
     setLoading(true); setMarketData(null); setDataError(null); setDataErrorKind("connection");
     try {
@@ -544,7 +571,7 @@ export default function Home() {
       const universe = priceUniverse(requested);
       const supplied = universe.filter(t => uploadedPrices?.series[normalizeYahooSymbol(t)]);
       const [response,factorResponse] = await Promise.all([
-        fetch("/api/market-data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tickers: requested, supplied, years: isExample ? 5 : 10 }) }),
+        fetch("/api/market-data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tickers: requested, supplied, years: isResearch ? Math.max(5,new Date().getUTCFullYear()-2020) : isExample ? 5 : 10 }) }),
         fetch("/api/academic-factors")
       ]);
       const [rawPayload,published] = await Promise.all([response.json(),factorResponse.json()]);
@@ -555,7 +582,7 @@ export default function Home() {
         setDataErrorKind(response.status >= 400 && response.status < 500 && response.status !== 429 ? "request" : "connection");
         throw new Error(payload.error || "Market data request failed.");
       }
-      const availableEnd = payload.asOf || payload.series.SPY?.points.at(-1)?.date || "";
+      const availableEnd = [payload.asOf || payload.series.SPY?.points.at(-1)?.date || "", ...(isResearch?[diversificationThrough]:[])].sort()[0];
       const availableStart = payload.factorStartDate || payload.series.SPY?.points[0]?.date || "";
       const defaultStartDate = new Date(`${availableEnd}T00:00:00Z`);
       defaultStartDate.setUTCFullYear(defaultStartDate.getUTCFullYear() - 3);
@@ -567,7 +594,7 @@ export default function Home() {
       if(request!==marketRequest.current)return;
       setDataError(error instanceof Error ? error.message : "Unable to load Yahoo Finance data.");
     } finally { if(request===marketRequest.current)setLoading(false); }
-  }, [tickerKey,isArchivedPortfolio,isExample,uploadedPrices]);
+  }, [tickerKey,isArchivedPortfolio,isExample,isResearch,routeReady,uploadedPrices]);
 
   // Synchronize the current ticker set with the external market-data service.
   // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -605,8 +632,8 @@ export default function Home() {
   function remove(ticker: string) { if(ticker==="CASH")return;setHoldings(items=>{const removed=items.find(item=>item.ticker===ticker)?.value??0;const remaining=items.filter(item=>item.ticker!==ticker);return remaining.some(item=>item.ticker==="CASH")?remaining.map(item=>item.ticker==="CASH"?{...item,value:item.value+removed}:item):[...remaining,{ticker:"CASH",name:"Cash (residual)",sector:"Cash",value:removed,beta:0,vol:0,risk:0}]}); }
   function addSecurity(rawTicker:string) {const ticker=rawTicker.trim().toUpperCase();if(!/^[A-Z][A-Z0-9.-]{0,9}$/.test(ticker)){setPortfolioError("Enter a valid US ticker symbol.");return}if(holdings.some(item=>item.ticker===ticker)){setPortfolioError(`${ticker} is already in the portfolio.`);return}const match=stockCatalog.find(item=>item[0]===ticker);const added:Holding={ticker,name:match?.[1]??ticker,sector:match?.[2]??"Unclassified",value:0,beta:1,vol:25,risk:2};setHoldings(items=>[...items.filter(item=>item.ticker!=="CASH"),added,...items.filter(item=>item.ticker==="CASH")]);setAddingSecurity(false);setSecuritySearch("");setPortfolioError(null)}
   function saveBaseline(){setBaselineHoldings(holdings.map(item=>({...item})));}
-  function loadDemo(key:DemoKey){const url=new URL(window.location.href);url.searchParams.set("portfolio",key);window.history.replaceState(null,"",url);const next=key==="ai"?aiPortfolioSeed:key==="published-market-neutral"?publishedMarketNeutralSeed:key==="published-dow"?publishedDowSeed:key==="example"?exampleSeed:equitySeed;setDemoKey(key);setHoldings(next.map(item=>({...item})));setBaselineHoldings(next.map(item=>({...item})));setPortfolioSource("demo");setPortfolioName(key==="ai"?"AI Theme Portfolio":key==="published-market-neutral"?"AQR Equity Market Neutral":key==="published-dow"?"Published Dow Strategy":key==="example"?"US Equity Portfolio":"US Equity Portfolio");setPortfolioError(null);setSelectedTicker(null);setEditing(false)}
-  useEffect(()=>{if(new URLSearchParams(window.location.search).get("portfolio")==="example")loadDemo("example")},[]);
+  function loadDemo(key:DemoKey){const url=new URL(window.location.href);url.searchParams.set("portfolio",key);window.history.replaceState(null,"",url);setExampleFirstMonth("");setAnalysisEnd("");setAnalysisStart("");const next=key==="diversification"?diversificationSeed:key==="ai"?aiPortfolioSeed:key==="published-market-neutral"?publishedMarketNeutralSeed:key==="published-dow"?publishedDowSeed:key==="example"?exampleSeed:equitySeed;setDemoKey(key);setHoldings(next.map(item=>({...item})));setBaselineHoldings(next.map(item=>({...item})));setPortfolioSource("demo");setPortfolioName(key==="diversification"?diversificationName:key==="ai"?"AI Theme Portfolio":key==="published-market-neutral"?"AQR Equity Market Neutral":key==="published-dow"?"Published Dow Strategy":key==="example"?"US Equity Portfolio":"US Equity Portfolio");setPortfolioError(null);setSelectedTicker(null);setEditing(false)}
+  useEffect(()=>{const key=new URLSearchParams(window.location.search).get("portfolio");if(key==="ai"||key==="example")loadDemo(key);setRouteReady(true);},[]);
   function resetDemo(){loadDemo(demoKey)}
   async function upload(file: File, kind: CsvKind) {
     if (file.size > 25_000_000) throw Error("Use a CSV under 25 MB.");
@@ -646,7 +673,7 @@ export default function Home() {
 
   function openEventCorrelations(startDate:string,endDate:string){setAnalysisStart(startDate);setAnalysisEnd(endDate);setRiskTab("Correlations");setView("Risk Analysis")}
   const availableStartDate = marketData?.factorStartDate ?? marketData?.series.SPY?.points[0]?.date ?? "";
-  const availableEndDate = marketData?.asOf ?? marketData?.series.SPY?.points.at(-1)?.date ?? "";
+  const availableEndDate = [marketData?.asOf ?? marketData?.series.SPY?.points.at(-1)?.date ?? "", ...(isResearch?[diversificationThrough]:[])].sort()[0];
   const viewCopy: Record<View, [string, string]> = {
     "Hedge Support": ["Hedge Support", "Compare individual ETF overlays and validate a dated hedge rule."],
     "Overview": ["See what is driving the portfolio", "Separate performance associated with market, style and sector factors from the idiosyncratic return that remains."],
@@ -668,7 +695,7 @@ export default function Home() {
   const isCovarianceView=view==="Risk Analysis"&&riskTab==="Risk & Correlation Forecast";
   const displayedViewCopy:[string,string]=isStatisticalView?["Statistical factor exposure","Understand your portfolio’s statistical factor relationships and sources of risk."]:isCovarianceView?["Risk & correlation forecast","Inspect the next-session CM-IEWMA covariance forecast used by portfolio risk and Strategy Lab."]:viewCopy[view];
 
-  const exampleWorkspace=loading||isAI&&!aiMetadata&&!aiCoverageError?<DataLoading/>:marketData&&overviewData&&overviewSnapshot?<ExamplePortfolio riskSummary={overviewRiskSummary} key={demoKey} portfolioName={portfolioName} isAI={isAI} sectors={isAI?Object.fromEntries(aiPortfolioSeed.map(h=>[h.ticker,h.sector])):exampleSectors} payload={marketData} example={overviewData} firstMonth={exampleMonth} setFirstMonth={month=>{setExampleFirstMonth(month);setAnalysisStart(`${month}-01`);setAnalysisEnd(marketData.asOf??"")}} cost={executionCostBps} setCost={setExecutionCostBps} selectedDate={overviewSnapshot.date} setSelectedDate={setAnalysisEnd} onSelectTicker={setSelectedTicker} renderDecomposition={d=><DecompositionChart decomposition={d}/>}/>:<section className="data-state"><div><strong>{dataError?"Portfolio data unavailable":isAI?"No shared price history in this range":"No complete months in this range"}</strong><p>{(dataError||aiCoverageError||aiResult.error)||"Choose the default period to restore portfolio history."}</p><button onClick={()=>{setExampleFirstMonth("");setAnalysisEnd(marketData?.asOf??"");if(aiCoverageError)setAiCoverageRetry(n=>n+1);if(dataError)void loadMarketData();}}>Restore portfolio</button></div></section>;
+  const exampleWorkspace=loading||isResearch&&!account&&!accountError||isAI&&!aiMetadata&&!aiCoverageError?<DataLoading/>:marketData&&overviewData&&overviewSnapshot?<ExamplePortfolio riskSummary={overviewRiskSummary} key={demoKey} portfolioName={portfolioName} fixedCosts={isResearch} isAI={isAI} sectors={isResearch?Object.fromEntries(diversificationSeed.map(h=>[h.ticker,h.sector])):isAI?Object.fromEntries(aiPortfolioSeed.map(h=>[h.ticker,h.sector])):exampleSectors} payload={marketData} example={overviewData} firstMonth={exampleMonth} setFirstMonth={month=>{setExampleFirstMonth(month);setAnalysisStart(`${month}-01`);setAnalysisEnd(availableEndDate)}} cost={executionCostBps} setCost={setExecutionCostBps} selectedDate={overviewSnapshot.date} setSelectedDate={setAnalysisEnd} onSelectTicker={setSelectedTicker} renderDecomposition={d=><DecompositionChart decomposition={d}/>}/>:<section className="data-state"><div><strong>{dataError?"Portfolio data unavailable":isAI?"No shared price history in this range":"No complete months in this range"}</strong><p>{(dataError||accountError||aiCoverageError||aiResult.error)||"Choose the default period to restore portfolio history."}</p><button onClick={()=>{setExampleFirstMonth("");setAnalysisEnd(availableEndDate);if(accountError)setAccountRetry(n=>n+1);if(aiCoverageError)setAiCoverageRetry(n=>n+1);if(dataError)void loadMarketData();}}>Restore portfolio</button></div></section>;
 
   return (
     <main className="app-shell">
@@ -683,8 +710,8 @@ export default function Home() {
       </header>
 
       <section className="portfolio-toolbar" aria-label="Current portfolio">
-        <label className="portfolio-switcher"><select aria-label="Choose portfolio" value={portfolioSource==="demo"?demoKey:"uploaded"} onChange={event=>event.target.value!=="uploaded"&&loadDemo(event.target.value as DemoKey)}><option value="example">US Equity Portfolio</option><option value="ai">AI Theme Portfolio</option>{portfolioSource==="uploaded"&&<option value="uploaded">Uploaded portfolio</option>}</select></label>
-        <div className="toolbar-dates">{(isCovarianceView||view==="Optimizer"||view==="Hedge Support")?<div className="date-control covariance-date-control"><span>{view==="Optimizer"?"OPTIMIZATION AS OF":"FORECAST AS OF"}</span><label><small>DATE</small><input type="date" aria-label="Risk & correlation forecast date" min={availableStartDate} max={availableEndDate} value={analysisEnd} disabled={!availableEndDate} onChange={(event)=>setAnalysisEnd(event.target.value)} /></label></div>:!(view==="Overview"&&(isAI||isExample))&&!isStatisticalView && primarySection !== "About" && view !== "Compare" && !(view === "Performance" && performanceTab === "Event Analysis") && <div className="date-control"><span>ANALYSIS PERIOD</span><label><small>FROM</small><input type="date" aria-label="Analysis start date" min={availableStartDate} max={analysisEnd || availableEndDate} value={analysisStart} disabled={!availableStartDate} onChange={(event)=>setAnalysisStart(event.target.value)} /></label><i>→</i><label><small>TO</small><input type="date" aria-label="Analysis end date" min={analysisStart || availableStartDate} max={availableEndDate} value={analysisEnd} disabled={!availableEndDate} onChange={(event)=>setAnalysisEnd(event.target.value)} /></label></div>}</div>
+        <label className="portfolio-switcher"><select aria-label="Choose portfolio" value={portfolioSource==="demo"?demoKey:"uploaded"} onChange={event=>event.target.value!=="uploaded"&&loadDemo(event.target.value as DemoKey)}><option value="diversification">{diversificationName}</option><option value="example">US Equity Portfolio</option><option value="ai">AI Theme Portfolio</option>{portfolioSource==="uploaded"&&<option value="uploaded">Uploaded portfolio</option>}</select></label>
+        <div className="toolbar-dates">{(isCovarianceView||view==="Optimizer"||view==="Hedge Support")?<div className="date-control covariance-date-control"><span>{view==="Optimizer"?"OPTIMIZATION AS OF":"FORECAST AS OF"}</span><label><small>DATE</small><input type="date" aria-label="Risk & correlation forecast date" min={availableStartDate} max={availableEndDate} value={analysisEnd} disabled={!availableEndDate} onChange={(event)=>setAnalysisEnd(event.target.value)} /></label></div>:!(view==="Overview"&&(isResearch||isAI||isExample))&&!isStatisticalView && primarySection !== "About" && view !== "Compare" && !(view === "Performance" && performanceTab === "Event Analysis") && <div className="date-control"><span>ANALYSIS PERIOD</span><label><small>FROM</small><input type="date" aria-label="Analysis start date" min={availableStartDate} max={analysisEnd || availableEndDate} value={analysisStart} disabled={!availableStartDate} onChange={(event)=>setAnalysisStart(event.target.value)} /></label><i>→</i><label><small>TO</small><input type="date" aria-label="Analysis end date" min={analysisStart || availableStartDate} max={availableEndDate} value={analysisEnd} disabled={!availableEndDate} onChange={(event)=>setAnalysisEnd(event.target.value)} /></label></div>}</div>
         <strong className="toolbar-value">{money(isAI&&view==="Overview"&&overviewSnapshot?overviewSnapshot.nav:total)}</strong>
         <span className="toolbar-holdings">{(isAI&&view==="Overview"&&overviewSnapshot?overviewSnapshot.holdings:holdings).filter(h=>h.ticker!=="CASH"&&h.value!==0).length} positions · USD{isExample&&exampleSnapshot?` · ${exampleSnapshot.date}`:""}{hasShort?` · ${(grossExposure/Math.max(total,1)*100).toFixed(0)}% gross`:""}</span>
         <div className="portfolio-tools">
@@ -700,14 +727,14 @@ export default function Home() {
 
       <section className="workspace">
         {primarySection === "Portfolio & Risk" && <div className="section-tabs" role="tablist" aria-label="Portfolio and risk views">
-          {(["Overview","Factors","Statistical Model","Risk & Correlation Forecast","Positions","Correlations","Security","Events"] as const).filter(tab=>tab!=="Events"||!(isAI||isExample||isArchivedPortfolio)).map(tab=><button key={tab} role="tab" aria-selected={portfolioRiskTab===tab} disabled={isArchivedPortfolio&&tab!=="Overview"} className={portfolioRiskTab===tab?"active":""} onClick={()=>{
+          {(["Overview","Factors","Statistical Model","Risk & Correlation Forecast","Positions","Correlations","Security","Events"] as const).filter(tab=>tab!=="Events"||!(isResearch||isAI||isExample||isArchivedPortfolio)).map(tab=><button key={tab} role="tab" aria-selected={portfolioRiskTab===tab} disabled={isArchivedPortfolio&&tab!=="Overview"} className={portfolioRiskTab===tab?"active":""} onClick={()=>{
             if(tab==="Overview")setView("Overview");
             else if(tab==="Events"){setView("Performance");setPerformanceTab("Event Analysis")}
             else if(tab==="Security"){setView("Security Analysis");if(!selectedTicker)setSelectedTicker(holdings.find(item=>item.ticker!=="CASH")?.ticker??null)}
             else{setView("Risk Analysis");setRiskTab(tab)}
           }}>{tab}</button>)}
         </div>}
-        {isArchivedPortfolio&&primarySection!=="About"?<PublishedDowPortfolio/>:(isExample||isAI)&&view==="Overview"?exampleWorkspace:<>
+        {isArchivedPortfolio&&primarySection!=="About"?<PublishedDowPortfolio/>:(isResearch||isExample||isAI)&&view==="Overview"?exampleWorkspace:<>
         {editing && !isPublishedFund && !isReadOnlyPortfolio && <div className="editor-panel" ref={editorRef}>
           <div className="panel-head"><div><span className="kicker">PORTFOLIO BUILDER</span><h2>Edit positions</h2></div><div className="panel-actions"><button className="secondary-action" onClick={saveBaseline}>Save current as baseline</button><button className="secondary-action" onClick={normalizeInvested}>{hasShort?"Normalize to 200% gross":"Normalize invested to 100%"}</button><button onClick={()=>setAddingSecurity(current=>!current)}><Icon name="plus" /> Add security</button></div></div>
           {addingSecurity&&<div className="security-picker"><label><span>SEARCH BY TICKER OR COMPANY</span><input autoFocus value={securitySearch} onChange={event=>setSecuritySearch(event.target.value)} onKeyDown={event=>{if(event.key==="Enter")addSecurity(securitySearch)}} placeholder="Try META, Broadcom or JPMorgan"/></label><div className="security-picker-results">{stockCatalog.filter(item=>!holdings.some(holding=>holding.ticker===item[0])&&(!securitySearch.trim()||`${item[0]} ${item[1]}`.toLowerCase().includes(securitySearch.trim().toLowerCase()))).slice(0,8).map(item=><button key={item[0]} onClick={()=>addSecurity(item[0])}><strong>{item[0]}</strong><span>{item[1]}</span><em>{item[2]}</em></button>)}{securitySearch.trim()&&!stockCatalog.some(item=>item[0]===securitySearch.trim().toUpperCase())&&<button className="add-custom-security" onClick={()=>addSecurity(securitySearch)}><strong>ADD {securitySearch.trim().toUpperCase()}</strong><span>Use typed Yahoo Finance ticker</span><em>Verify after loading</em></button>}</div></div>}
@@ -731,12 +758,12 @@ export default function Home() {
         {primarySection!=="About" && !loading && !analytics && !dataError && <DataUnavailable />}
         {!loading && analytics && !factorModel && ((view === "Risk Analysis"&&riskTab!=="Risk & Correlation Forecast") || view === "Performance") && <FactorModelUnavailable />}
         {view === "Overview" && analytics && <Overview riskSummary={overviewRiskSummary} total={total} invested={invested} holdings={holdings} analytics={analytics} decomposition={portfolioDecomposition} onSelectTicker={setSelectedTicker} executionCostBps={executionCostBps} shortBorrowRate={shortBorrowRate} publishedFund={isPublishedFund} />}
-        {view === "Compare" && analytics && marketData && (!(isAI||isExample)||overviewData) && <PortfolioComparisonWorkspace onHistoricalTest={()=>{setHistoryTestOpen(true);setView("Optimizer");}} onAdopt={weights=>{const stocks=holdings.filter(h=>h.ticker!=="CASH").map(h=>({...h,value:total*(weights[h.ticker]??0)}));setHoldings([...stocks,{ticker:"CASH",name:"Cash and collateral",sector:"Cash",value:total-stocks.reduce((s,h)=>s+h.value,0),beta:0,vol:0,risk:0}]);setPortfolioSource("uploaded");setPortfolioName("My portfolio");setView("Overview");}} key={`${demoKey}-${portfolioSource}-${optimizerProposal?.signature===holdings.map(h=>`${h.ticker}:${h.value}`).join("|")?optimizerProposal.id:"manual"}`} initialWeights={optimizerProposal?.signature===holdings.map(h=>`${h.ticker}:${h.value}`).join("|")?optimizerProposal.weights:undefined} constructionSnapshot={optimizerProposal?.signature===holdings.map(h=>`${h.ticker}:${h.value}`).join("|")?optimizerProposal.snapshot:undefined} holdings={holdings} savedHoldings={comparisonHoldings} payload={marketData} reference={overviewData?.analytics ?? analytics} baselineHistory={overviewData} historyMode={isAI?"daily":"monthly"} historyCostBps={executionCostBps} onMethodology={()=>{setView("Methodology");setTimeout(()=>document.getElementById("about-strategy")?.scrollIntoView({behavior:"smooth"}),0);}} forecast={covarianceForecast} onSelectTicker={setSelectedTicker} renderPerformance={(current,alternative)=><PerformanceChart portfolio={current.curve} benchmark={alternative.curve} dates={current.dates} startDate={current.startDate} endDate={current.endDate} large primaryLabel="Portfolio history" secondaryLabel="Replayed sizing" definition="Growth of $1 using one set of sizing choices across past holdings. The optimizer is not rerun at historical dates. This is separate from a historical optimizer test."/>}/>}
+        {view === "Compare" && analytics && marketData && (!(isResearch||isAI||isExample)||overviewData) && <PortfolioComparisonWorkspace comparisonView={comparisonView} setComparisonView={setComparisonView} testPanel={<HistoryTestComparison runs={testRuns} selectedId={selectedTest} onSelect={setSelectedTest} reference={overviewData?.analytics??analytics} payload={marketData} renderChart={(dates,test,original,testName,originalName)=><PerformanceChart key={selectedTest+originalName} portfolio={test} benchmark={original} dates={dates} startDate={dates[0]} endDate={dates.at(-1)!} primaryLabel={testName} secondaryLabel={originalName} large definition="Growth of $1 from the first close of the test. The tested strategy includes its executed trades and configured costs."/>}/>} onHistoricalTest={()=>{setHistoryTestOpen(true);setView("Optimizer");}} onAdopt={weights=>{const stocks=holdings.filter(h=>h.ticker!=="CASH").map(h=>({...h,value:total*(weights[h.ticker]??0)}));setHoldings([...stocks,{ticker:"CASH",name:"Cash and collateral",sector:"Cash",value:total-stocks.reduce((s,h)=>s+h.value,0),beta:0,vol:0,risk:0}]);setPortfolioSource("uploaded");setPortfolioName("My portfolio");setView("Overview");}} key={`${demoKey}-${portfolioSource}-${optimizerProposal?.signature===holdings.map(h=>`${h.ticker}:${h.value}`).join("|")?optimizerProposal.id:"manual"}`} initialWeights={optimizerProposal?.signature===holdings.map(h=>`${h.ticker}:${h.value}`).join("|")?optimizerProposal.weights:undefined} constructionSnapshot={optimizerProposal?.signature===holdings.map(h=>`${h.ticker}:${h.value}`).join("|")?optimizerProposal.snapshot:undefined} holdings={holdings} savedHoldings={comparisonHoldings} payload={marketData} reference={overviewData?.analytics ?? analytics} baselineHistory={overviewData} historyMode={isResearch?"weekly":isAI?"daily":"monthly"} historyCostBps={isResearch?5:executionCostBps} onMethodology={()=>{setView("Methodology");setTimeout(()=>document.getElementById("about-strategy")?.scrollIntoView({behavior:"smooth"}),0);}} forecast={covarianceForecast} onSelectTicker={setSelectedTicker} renderPerformance={(current,alternative)=><PerformanceChart portfolio={current.curve} benchmark={alternative.curve} dates={current.dates} startDate={current.startDate} endDate={current.endDate} large primaryLabel="Portfolio history" secondaryLabel="Replayed sizing" definition="Growth of $1 using one set of sizing choices across past holdings. The optimizer is not rerun at historical dates. This is separate from a historical optimizer test."/>}/>}
         {view === "Strategy Analysis" && marketData && (isPublishedFund?<section className="data-state"><div><strong>The fund’s allocation is managed by AQR</strong><p>Daily underlying weights are not available here. Risk Targeting controls cannot change the fund’s historical trades. Choose the US Equity Portfolio to construct and inspect a dynamic allocation.</p></div></section>:hasShort?<section className="data-state"><div><strong>Risk Targeting is long-only</strong><p>Switch to the US Equity Portfolio demo or remove short positions. Portfolios with short positions can still be analyzed in Portfolio &amp; Risk, Compare and Scenarios.</p></div></section>:<StrategyAnalysis onHistoricalTest={()=>{setHistoryTestOpen(true);setView("Optimizer");}} strategy={strategyAnalytics} snapshot={riskTargetSnapshot} isUpdating={strategyBacktestUpdating} total={total} frequency={strategyFrequency} setFrequency={setStrategyFrequency} targetVolatility={strategyTargetVolatility} setTargetVolatility={setStrategyTargetVolatility} targetBeta={strategyTargetBeta} setTargetBeta={setStrategyTargetBeta} maxPosition={strategyMaxPosition} setMaxPosition={setStrategyMaxPosition} applied={deferredStrategyConfig} hasPendingChanges={strategyHasPendingChanges} onRunBacktest={()=>setAppliedStrategyConfig({frequency:strategyFrequency,targetVolatility:strategyTargetVolatility,targetBeta:strategyTargetBeta,maxPosition:strategyMaxPosition})} onResetDraft={()=>{setStrategyFrequency(appliedStrategyConfig.frequency);setStrategyTargetVolatility(appliedStrategyConfig.targetVolatility);setStrategyTargetBeta(appliedStrategyConfig.targetBeta);setStrategyMaxPosition(appliedStrategyConfig.maxPosition)}} onSelectTicker={setSelectedTicker} payload={marketData} startDate={analytics?.startDate??analysisStart} endDate={analytics?.endDate??analysisEnd} />)}
         {view === "Security Analysis" && analytics && <SecurityAnalysisWorkspace holdings={holdings} selectedTicker={selectedTicker} onSelectTicker={setSelectedTicker} security={securityAnalytics} portfolio={analytics} total={total} />}
         {view === "Hedge Support" && marketData && <HedgeSupport payload={marketData} holdings={holdings} history={overviewData} asOf={analysisEnd} onMethodology={()=>{setView("Methodology");setTimeout(()=>document.getElementById("about-hedges")?.scrollIntoView({behavior:"smooth"}),0);}}/>}
-        {optimizerWorkspaceActive && marketData && <div hidden={view!=="Optimizer"}><PortfolioOptimizer forecastBook={forecastBook} onUploadForecasts={()=>openUpload("forecasts")} historyTestOpen={historyTestOpen} onHistoryTestOpenChange={setHistoryTestOpen} history={overviewData} referenceHistory={overviewData?.analytics??analytics} key={`${optimizerBaseForecast?.asOf}-${holdings.map(h=>`${h.ticker}:${h.value}`).join("|")}`} holdings={holdings} payload={marketData} forecast={optimizerBaseForecast} riskEstimator={optimizerRiskEstimator} setRiskEstimator={setOptimizerRiskEstimator} onAsOfChange={setAnalysisEnd} onSelectTicker={setSelectedTicker} onApply={(weights,snapshot)=>{setOptimizerProposal({weights,snapshot,signature:holdings.map(h=>`${h.ticker}:${h.value}`).join("|"),id:Date.now()});setView("Compare");}}/></div>}
-        {isStatisticalView && <StatisticalModel maxDate={marketData?.asOf??""} historicalPortfolio={isExample?exampleData:null} holdings={holdings} holdingsDate={isAI?AI_PORTFOLIO_DATE:isExample?exampleSnapshot?.date??"":analysisEnd} portfolioName={portfolioName} isAI={isAI}/> }
+        {optimizerWorkspaceActive && marketData && <div hidden={view!=="Optimizer"}><PortfolioOptimizer useResearchLimits={isResearch} runs={testRuns} onRunsChange={updateTestRuns} onReviewRun={reviewTest} portfolioName={portfolioName} forecastBook={forecastBook} onUploadForecasts={()=>openUpload("forecasts")} historyTestOpen={historyTestOpen} onHistoryTestOpenChange={setHistoryTestOpen} history={overviewData} referenceHistory={overviewData?.analytics??analytics} key={`${optimizerBaseForecast?.asOf}-${holdings.map(h=>`${h.ticker}:${h.value}`).join("|")}`} holdings={holdings} payload={marketData} forecast={optimizerBaseForecast} riskEstimator={optimizerRiskEstimator} setRiskEstimator={setOptimizerRiskEstimator} onAsOfChange={setAnalysisEnd} onSelectTicker={setSelectedTicker} onApply={(weights,snapshot)=>{setComparisonView("Allocation & forecast");setOptimizerProposal({weights,snapshot,signature:holdings.map(h=>`${h.ticker}:${h.value}`).join("|"),id:Date.now()});setView("Compare");}}/></div>}
+        {isStatisticalView && <StatisticalModel maxDate={marketData?.asOf??""} historicalPortfolio={isResearch?researchData:isExample?exampleData:null} holdings={holdings} holdingsDate={isResearch?overviewSnapshot?.date??"":isAI?AI_PORTFOLIO_DATE:isExample?exampleSnapshot?.date??"":analysisEnd} portfolioName={portfolioName} isAI={isAI}/> }
         {view === "Risk Analysis" && !isStatisticalView && analytics && marketData && !(isPublishedFund&&(riskTab==="Risk & Correlation Forecast"||riskTab==="Correlations")) && <RiskWorkspace tab={riskTab} model={factorModel} total={total} holdings={holdings} analytics={analytics} payload={marketData} forecast={covarianceForecast} onSelectTicker={setSelectedTicker} />}
         {view === "Risk Analysis" && isPublishedFund && (riskTab==="Risk & Correlation Forecast"||riskTab==="Correlations") && <section className="data-state"><div><strong>Underlying holdings history is unavailable</strong><p>The published demo provides the fund’s return series. A cross-security covariance or correlation matrix requires the underlying security universe and dated positions. Use the US Equity Portfolio or an uploaded portfolio for these tools.</p></div></section>}
         {view === "Performance" && analytics && factorModel && marketData && <PerformanceWorkspace tab={performanceTab} setTab={setPerformanceTab} total={total} analytics={analytics} model={factorModel} payload={marketData} holdings={holdings} onSelectTicker={setSelectedTicker} onExploreCorrelations={openEventCorrelations} />}

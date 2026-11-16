@@ -1,0 +1,542 @@
+[
+  {
+    "ticker": "AMAT",
+    "name": "Applied Materials, Inc.",
+    "sector": "Technology",
+    "value": 0.0,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "AMD",
+    "name": "Advanced Micro Devices, Inc.",
+    "sector": "Technology",
+    "value": 4227.73,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "AMZN",
+    "name": "Amazon.com, Inc.",
+    "sector": "Consumer Discretionary",
+    "value": 12339.8,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "ANET",
+    "name": "Arista Networks, Inc.",
+    "sector": "Technology",
+    "value": 0.0,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "AVGO",
+    "name": "Broadcom Inc.",
+    "sector": "Technology",
+    "value": 21130.97,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "CDNS",
+    "name": "Cadence Design Systems, Inc.",
+    "sector": "Technology",
+    "value": 0.0,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "CIEN",
+    "name": "Ciena Corporation",
+    "sector": "Technology",
+    "value": 18380.53,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "DELL",
+    "name": "Dell Technologies Inc.",
+    "sector": "Technology",
+    "value": 26800.21,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "DLR",
+    "name": "Digital Realty Trust, Inc.",
+    "sector": "Real Estate",
+    "value": 0.0,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "EQIX",
+    "name": "Equinix, Inc.",
+    "sector": "Real Estate",
+    "value": 19644.06,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "ETN",
+    "name": "Eaton Corporation plc",
+    "sector": "Industrials",
+    "value": 27531.7,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "FTNT",
+    "name": "Fortinet, Inc.",
+    "sector": "Technology",
+    "value": 92037.55,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "GLW",
+    "name": "Corning Incorporated",
+    "sector": "Technology",
+    "value": 21934.08,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "GOOG",
+    "name": "Alphabet Inc.",
+    "sector": "Communication Services",
+    "value": 0.0,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "INOD",
+    "name": "Innodata Inc.",
+    "sector": "Technology",
+    "value": 22061.1,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "KLAC",
+    "name": "KLA Corporation",
+    "sector": "Technology",
+    "value": 0.0,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "LRCX",
+    "name": "Lam Research Corporation",
+    "sector": "Technology",
+    "value": 0.0,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "META",
+    "name": "Meta Platforms, Inc.",
+    "sector": "Communication Services",
+    "value": 66535.87,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "MRVL",
+    "name": "Marvell Technology, Inc.",
+    "sector": "Technology",
+    "value": 53778.05,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "MSFT",
+    "name": "Microsoft Corporation",
+    "sector": "Technology",
+    "value": 52064.89,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "MU",
+    "name": "Micron Technology, Inc.",
+    "sector": "Technology",
+    "value": 36984.72,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "NRG",
+    "name": "NRG Energy, Inc.",
+    "sector": "Utilities",
+    "value": 0.0,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "NVDA",
+    "name": "NVIDIA Corporation",
+    "sector": "Technology",
+    "value": 41299.11,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "ORCL",
+    "name": "Oracle Corporation",
+    "sector": "Technology",
+    "value": 75148.67,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "PWR",
+    "name": "Quanta Services, Inc.",
+    "sector": "Industrials",
+    "value": 0.0,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "SNPS",
+    "name": "Synopsys, Inc.",
+    "sector": "Technology",
+    "value": 0.0,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "UEC",
+    "name": "Uranium Energy Corp.",
+    "sector": "Energy",
+    "value": 10856.46,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "VRT",
+    "name": "Vertiv Holdings Co",
+    "sector": "Industrials",
+    "value": 0.0,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "VST",
+    "name": "Vistra Corp.",
+    "sector": "Utilities",
+    "value": 35601.32,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "WDC",
+    "name": "Western Digital Corporation",
+    "sector": "Technology",
+    "value": 52028.75,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "ACGL",
+    "name": "Arch Capital Group Ltd.",
+    "sector": "Financials",
+    "value": 433015.04,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "ADP",
+    "name": "Automatic Data Processing, Inc.",
+    "sector": "Industrials",
+    "value": 189104.15,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "ARE",
+    "name": "Alexandria Real Estate Equities, Inc.",
+    "sector": "Real Estate",
+    "value": 5370.19,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "AXP",
+    "name": "American Express Company",
+    "sector": "Financials",
+    "value": 0.0,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "CAT",
+    "name": "Caterpillar Inc.",
+    "sector": "Industrials",
+    "value": 0.0,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "COHR",
+    "name": "Coherent Corp.",
+    "sector": "Technology",
+    "value": 47822.48,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "CTAS",
+    "name": "Cintas Corporation",
+    "sector": "Industrials",
+    "value": 0.0,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "DRI",
+    "name": "Darden Restaurants, Inc.",
+    "sector": "Consumer Discretionary",
+    "value": 135579.56,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "ECL",
+    "name": "Ecolab Inc.",
+    "sector": "Materials",
+    "value": 0.0,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "EFX",
+    "name": "Equifax Inc.",
+    "sector": "Industrials",
+    "value": 0.0,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "FE",
+    "name": "FirstEnergy Corp.",
+    "sector": "Utilities",
+    "value": 33325.86,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "IP",
+    "name": "International Paper Company",
+    "sector": "Materials",
+    "value": 0.0,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "IT",
+    "name": "Gartner, Inc.",
+    "sector": "Technology",
+    "value": 44055.73,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "JCI",
+    "name": "Johnson Controls International plc",
+    "sector": "Industrials",
+    "value": 12106.3,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "JPM",
+    "name": "JPMorgan Chase & Co.",
+    "sector": "Financials",
+    "value": 0.0,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "KDP",
+    "name": "Keurig Dr Pepper Inc.",
+    "sector": "Consumer Staples",
+    "value": 71883.52,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "KEYS",
+    "name": "Keysight Technologies, Inc.",
+    "sector": "Technology",
+    "value": 0.0,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "KMI",
+    "name": "Kinder Morgan, Inc.",
+    "sector": "Energy",
+    "value": 267227.86,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "KO",
+    "name": "The Coca-Cola Company",
+    "sector": "Consumer Staples",
+    "value": 414443.34,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "LVS",
+    "name": "Las Vegas Sands Corp.",
+    "sector": "Consumer Discretionary",
+    "value": 57616.16,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "MCK",
+    "name": "McKesson Corporation",
+    "sector": "Healthcare",
+    "value": 173530.34,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "MSCI",
+    "name": "MSCI Inc.",
+    "sector": "Financials",
+    "value": 90367.14,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "MTD",
+    "name": "Mettler-Toledo International Inc.",
+    "sector": "Healthcare",
+    "value": 4266.7,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "OMC",
+    "name": "Omnicom Group Inc.",
+    "sector": "Communication Services",
+    "value": 12520.94,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "PLD",
+    "name": "Prologis, Inc.",
+    "sector": "Real Estate",
+    "value": 0.0,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "PNC",
+    "name": "The PNC Financial Services Group, Inc.",
+    "sector": "Financials",
+    "value": 0.0,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "SO",
+    "name": "The Southern Company",
+    "sector": "Utilities",
+    "value": 282599.34,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "TECH",
+    "name": "Bio-Techne Corporation",
+    "sector": "Healthcare",
+    "value": 33436.06,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "TPR",
+    "name": "Tapestry, Inc.",
+    "sector": "Consumer Discretionary",
+    "value": 0.0,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  },
+  {
+    "ticker": "UNH",
+    "name": "UnitedHealth Group Incorporated",
+    "sector": "Healthcare",
+    "value": 3310.93,
+    "beta": 0,
+    "vol": 0,
+    "risk": 0
+  }
+]

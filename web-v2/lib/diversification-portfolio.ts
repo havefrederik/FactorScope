@@ -3,7 +3,7 @@ import type {ExampleDay, ExamplePortfolioResult, ExampleRebalance} from "./examp
 import {pathAnalytics} from "./comparison-history.ts";
 import {historicalSharpe} from "./historical-sharpe.ts";
 
-export const diversificationName = "Maximum Diversification · Portfolio 18";
+export const diversificationName = "Default Portfolio";
 export const diversificationThrough = "2026-09-30";
 export type AccountRow = [date:string, wealth:number, holdings:[number,number][], executed:boolean, feeFraction:number];
 export type ResearchAccount = {tickers:string[]; rows:AccountRow[]};

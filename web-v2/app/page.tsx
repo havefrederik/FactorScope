@@ -495,7 +495,7 @@ export default function Home() {
     const controller=new AbortController();
     setAccountError("");
     fetch("/data/portfolio-18.json",{signal:controller.signal}).then(async r=>{
-      if(!r.ok)throw Error("Portfolio 18’s dated holdings could not be loaded.");
+      if(!r.ok)throw Error("Default Portfolio’s dated holdings could not be loaded.");
       return r.json() as Promise<ResearchAccount>;
     }).then(setAccount).catch(e=>{if(!controller.signal.aborted)setAccountError((e as Error).message);});
     return ()=>controller.abort();
